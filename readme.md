@@ -90,7 +90,11 @@ var geoJson = GeoJson.WriteString(collection);
 
 ### Simplify (vertex reduction)
 
-`Simplifier.Simplify` thins line and polygon-ring vertices with either [**Douglas–Peucker**](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm) (tolerance is a perpendicular distance in coordinate units) or [**Visvalingam–Whyatt**](https://en.wikipedia.org/wiki/Visvalingam%E2%80%93Whyatt_algorithm) (tolerance is an effective triangle area). It returns a new collection — names, layer properties, feature ids and tree structure are preserved; points pass through untouched and polygon rings stay closed and valid (never collapsing below a triangle). On the command line it's `--simplify <tolerance> [--simplify-method douglas-peucker|visvalingam]`:
+`Simplifier.Simplify` thins line and polygon-ring vertices with either [**Douglas–Peucker**](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm) (tolerance is a perpendicular distance in coordinate units) or [**Visvalingam–Whyatt**](https://en.wikipedia.org/wiki/Visvalingam%E2%80%93Whyatt_algorithm) (tolerance is an effective triangle area). It returns a new collection — names, layer properties, feature ids and tree structure are preserved; points pass through untouched and polygon rings stay closed and valid (never collapsing below a triangle).
+
+For datasets with shared boundaries — adjacent country/state polygons, contour pairs — use **`Simplifier.SimplifyTopology`** instead. The plain overload thins each ring independently, so two countries that share a border get that border simplified by different chord choices; the simplified edges then no longer line up, leaving hairline gaps along every shared border (visible as white stripes between countries) or, with a translucent fill, alpha-stacked overlap darkening. The topology variant runs a junction-detection pass first — vertices whose neighbours differ across two rings — splits each ring at its junctions, and simplifies each shared arc once, so both sides get bit-identical simplified vertices and stay seamlessly joined.
+
+On the command line it's `--simplify <tolerance> [--simplify-method douglas-peucker|visvalingam] [--simplify-topology]`:
 
 <!-- snippet: Simplify -->
 <a id='snippet-Simplify'></a>
@@ -110,8 +114,18 @@ GeoConverter.Write(coarse, "coastline.topojson");
 // closed and never collapse below a triangle, so the result is always valid.
 var smooth = Simplifier.Simplify(collection, 0.0001, SimplifyMethod.Visvalingam);
 GeoConverter.Write(smooth, "coastline-vw.geojson");
+
+// SimplifyTopology: same algorithms, but adjacent polygons that share a border get that
+// border simplified once — so the two sides stay seamlessly joined. The plain overload thins
+// each ring independently; two countries' shared edges then get different chord choices and
+// no longer line up, leaving hairline gaps (visible as white stripes between countries) or
+// alpha-stacked overlaps when the fill is translucent. Pick this for topologically
+// consistent datasets like Natural Earth admin layers where shared boundaries matter.
+var countries = GeoConverter.Read("countries.geojson");
+var topo = Simplifier.SimplifyTopology(countries, 0.05);
+GeoConverter.Write(topo, "countries-thin.fgb");
 ```
-<sup><a href='/src/Tests/Snippets.cs#L97-L115' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L97-L125' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -139,7 +153,7 @@ GeoConverter.Convert("countries.geojson", "countries.fgb", progress);
 var features = GeoConverter.Read("countries.geojson");
 MapRenderer.RenderPng(features, "world.png", new() { Progress = progress });
 ```
-<sup><a href='/src/Tests/Snippets.cs#L122-L141' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L132-L151' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -162,7 +176,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L146-L160' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L156-L170' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 `RenderOptions` controls the extent (`Bounds`), pixel `Width`/`Height` (height is derived from the aspect ratio when left at 0), `Padding`, and the `Background`/`Stroke`/`Fill` colors. From the command line, output a `.png` and pass `--bbox` and `--size`:
@@ -204,7 +218,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L409-L424' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L419-L434' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -230,7 +244,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L429-L443' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L439-L453' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -259,7 +273,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L448-L467' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L458-L477' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -318,7 +332,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(basemap, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L165-L209' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L175-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 When the layers come from independent sources (typically a basemap file plus an overlay file), pass the collections as a list — they render in order, first under, last on top. Each `FeatureCollection` is a top-level layer for `RenderOptions.LayerStyle`, and the rendered extent defaults to the union of every input's bounds:
@@ -356,7 +370,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L214-L246' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L224-L256' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -402,7 +416,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L314-L340' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L324-L350' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -439,7 +453,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L345-L372' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L355-L382' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -505,7 +519,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/src/Tests/Snippets.cs#L251-L309' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L261-L319' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -547,7 +561,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/src/Tests/Snippets.cs#L379-L404' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L389-L414' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

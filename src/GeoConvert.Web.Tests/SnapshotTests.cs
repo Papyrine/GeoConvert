@@ -134,6 +134,24 @@ public class SnapshotTests
         await Assert.That(source).StartsWith("data:image/png");
     }
 
+    // Clicking "View sample world map" fetches the world map bundled as a static web asset (built from
+    // MapBundle.World), then reads and renders it off the UI thread — the same pipeline as an upload but
+    // sourced from the build-time asset. A generous timeout covers reading/rasterising the whole world.
+    [Test]
+    public async Task SampleWorldMapRendersPreview()
+    {
+        var page = await browser!.NewPageAsync();
+        await page.GotoAsync($"http://localhost:{port}/");
+        await SettleAsync(page);
+
+        await page.ClickAsync(".sample-btn");
+
+        var image = await page.WaitForSelectorAsync(".preview img", new() { Timeout = 60000 });
+        var source = await image!.GetAttributeAsync("src");
+
+        await Assert.That(source).StartsWith("data:image/png");
+    }
+
     // The Download button runs the actual write/render conversion (off the UI thread) and then hands the
     // bytes to the browser. Confirm clicking it converts and triggers a file download.
     [Test]

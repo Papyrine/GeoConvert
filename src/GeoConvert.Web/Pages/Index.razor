@@ -1,5 +1,6 @@
 @page "/"
 @inject FileDownloadService FileDownloadService
+@inject HttpClient Http
 @inject IJSRuntime JsRuntime
 
 <PageTitle>GeoConvert — Map Format Converter</PageTitle>
@@ -22,6 +23,14 @@
             </span>
             <InputFile id="map-file" OnChange="OnFileSelected" class="file-input" accept="@ConversionService.ReadableAccept" />
         </label>
+
+        <div class="upload-or"><span>or</span></div>
+
+        @* Loads a world map bundled at build time from MapBundle.World (country borders, Douglas–Peucker
+           simplified) — fetched on demand so it only downloads when asked, never at app startup. *@
+        <button class="sample-btn" @onclick="LoadSampleWorldMap" disabled="@isBusy">
+            🌍 View sample world map
+        </button>
     </div>
 
     @if (errorMessage is not null)
@@ -222,6 +231,34 @@
         catch (Exception exception)
         {
             ReportError("Could not read the map", exception);
+            features = null;
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+    // Loads the world map bundled as a static web asset at /sample/world.fgb (built from MapBundle.World
+    // and simplified at build time). The fetch streams the FlatGeobuf bytes, then the read/render reuse
+    // the same off-thread pipeline as an uploaded file, so progress and preview behave identically.
+    async Task LoadSampleWorldMap()
+    {
+        Reset();
+        sourceName = "world.fgb";
+        sourceFormat = ConversionService.Find(GeoFormat.FlatGeobuf);
+
+        try
+        {
+            BeginPhase("Loading sample world map…");
+            var bytes = await Http.GetByteArrayAsync("sample/world.fgb");
+            features = await Task.Run(() => ConversionService.Read(bytes, GeoFormat.FlatGeobuf, progress));
+            featureCount = features.Count;
+            await RefreshPreviewAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError("Could not load the sample world map", exception);
             features = null;
         }
         finally

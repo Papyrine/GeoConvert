@@ -17,8 +17,47 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" />
+    <PackageReference Include="MapBundle.World" PrivateAssets="all" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
   </ItemGroup>
+
+  <!--
+    Bundle a sample world map as a static web asset, generated at build time from MapBundle.World.
+    MapBundle ships the world layers as full-detail FlatGeobuf (borders alone is ~63 MB); we run its
+    GeoConvert-backed convert task with a Douglas-Peucker tolerance to shrink the geometry to a
+    web-friendly size, then serve the result at /sample/world.fgb (read on demand when the user clicks
+    "View sample world map" — only downloaded then, never at app startup). FlatGeobuf is kept (binary,
+    far smaller than GeoJSON) and the app already reads it via ConversionService.
+  -->
+  <PropertyGroup>
+    <MapBundleSimplifyTolerance>0.1</MapBundleSimplifyTolerance>
+    <MapBundleSimplifyMethod>DouglasPeucker</MapBundleSimplifyMethod>
+  </PropertyGroup>
+
+  <!-- Only the country borders are wanted; drop the other layers (and meta.json) before conversion so
+       the build doesn't simplify ~200 MB of data we never bundle. -->
+  <Target Name="_KeepOnlyWorldBorders"
+          BeforeTargets="_MapBundleConvert;_MapBundleCopyRaw">
+    <ItemGroup>
+      <MapBundleData Remove="@(MapBundleData)" Condition="'%(Filename)' != 'borders'" />
+    </ItemGroup>
+  </Target>
+
+  <!-- _MapBundleConvert (BeforeTargets=AssignTargetPaths) writes the simplified borders.fgb into the
+       intermediate dir and surfaces it as @(_MapBundleConverted). Register that file as a Content item
+       linked under wwwroot so ResolveProjectStaticWebAssets (also BeforeTargets=AssignTargetPaths)
+       picks it up and serves it at /sample/world.fgb. -->
+  <Target Name="_BundleWorldSampleMap"
+          AfterTargets="_MapBundleConvert"
+          BeforeTargets="ResolveProjectStaticWebAssets"
+          Condition="'@(_MapBundleConverted)' != ''">
+    <ItemGroup>
+      <Content Include="@(_MapBundleConverted)" Condition="'%(_MapBundleConverted.Filename)' == 'borders'">
+        <Link>wwwroot\sample\world.fgb</Link>
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+    </ItemGroup>
+  </Target>
 
 </Project>

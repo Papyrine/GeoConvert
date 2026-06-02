@@ -64,8 +64,10 @@
     <Copy SourceFiles="@(_MapBundleConverted->WithMetadataValue('Filename', 'borders'))"
           DestinationFiles="$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb"
           SkipUnchangedFiles="true" />
+    <!-- Relative path under wwwroot so DefineStaticWebAssets' RelativePathPattern="wwwroot/**" matches it
+         and resolves ContentRoot to the real wwwroot (an absolute include doesn't match the pattern). -->
     <ItemGroup>
-      <Content Include="$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb" />
+      <Content Include="wwwroot\sample\world.fgb" />
     </ItemGroup>
   </Target>
 

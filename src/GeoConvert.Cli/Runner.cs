@@ -36,6 +36,8 @@ public static class Runner
         var height = 0;
         var maxDimension = 0;
         var projection = MapProjection.Auto;
+        double? simplifyTolerance = null;
+        var simplifyMethod = SimplifyMethod.DouglasPeucker;
         string? labelProperty = null;
         double? labelSize = null;
         Rgba? labelColor = null;
@@ -109,6 +111,35 @@ public static class Runner
                     if (!TryParseProjection(args[++i], out projection))
                     {
                         error.WriteLine("--projection must be 'auto', 'plate-carree', 'web-mercator', 'lambert', or 'goode'.");
+                        return 2;
+                    }
+
+                    break;
+                case "--simplify":
+                    if (i + 1 >= args.Length)
+                    {
+                        error.WriteLine("Missing value for --simplify.");
+                        return 2;
+                    }
+
+                    if (!double.TryParse(args[++i], NumberStyles.Float, CultureInfo.InvariantCulture, out var tolerance) || tolerance <= 0)
+                    {
+                        error.WriteLine("--simplify must be a positive number (tolerance).");
+                        return 2;
+                    }
+
+                    simplifyTolerance = tolerance;
+                    break;
+                case "--simplify-method":
+                    if (i + 1 >= args.Length)
+                    {
+                        error.WriteLine("Missing value for --simplify-method.");
+                        return 2;
+                    }
+
+                    if (!TryParseSimplifyMethod(args[++i], out simplifyMethod))
+                    {
+                        error.WriteLine("--simplify-method must be 'douglas-peucker' or 'visvalingam'.");
                         return 2;
                     }
 
@@ -256,9 +287,14 @@ public static class Runner
         {
             var fromFormat = from ?? GeoConverter.DetectFormat(input);
             var toFormat = to ?? GeoConverter.DetectFormat(outputPath);
+            var features = GeoConverter.Read(input, fromFormat);
+            if (simplifyTolerance is { } simplifyValue)
+            {
+                features = Simplifier.Simplify(features, simplifyValue, simplifyMethod);
+            }
+
             if (toFormat == GeoFormat.Png)
             {
-                var features = GeoConverter.Read(input, fromFormat);
                 var renderOptions = new RenderOptions
                 {
                     Bounds = bounds,
@@ -310,7 +346,7 @@ public static class Runner
             }
             else
             {
-                GeoConverter.Convert(input, fromFormat, outputPath, toFormat);
+                GeoConverter.Write(features, outputPath, toFormat);
             }
 
             output.WriteLine($"Converted {input} ({fromFormat}) -> {outputPath} ({toFormat}).");
@@ -379,6 +415,30 @@ public static class Runner
                 return true;
             default:
                 projection = default;
+                return false;
+        }
+    }
+
+    static bool TryParseSimplifyMethod(string text, out SimplifyMethod method)
+    {
+        // Hyphenated full names are canonical; the short forms (dp, rdp, vw) and unhyphenated spellings
+        // are accepted so users don't have to remember the exact form.
+        switch (text.ToLowerInvariant())
+        {
+            case "douglas-peucker":
+            case "douglaspeucker":
+            case "ramer-douglas-peucker":
+            case "rdp":
+            case "dp":
+                method = SimplifyMethod.DouglasPeucker;
+                return true;
+            case "visvalingam":
+            case "visvalingam-whyatt":
+            case "vw":
+                method = SimplifyMethod.Visvalingam;
+                return true;
+            default:
+                method = default;
                 return false;
         }
     }
@@ -456,6 +516,13 @@ public static class Runner
             Options:
               --from <format>        Force the input format.
               --to <format>          Force the output format.
+              --simplify <tolerance> Reduce vertices before writing (lossy line generalisation).
+                                     Tolerance units depend on the method: a perpendicular distance
+                                     in coordinate degrees for douglas-peucker, an effective triangle
+                                     area in degrees² for visvalingam. Larger drops more detail.
+                                     Points pass through; polygons stay valid (closed, >= a triangle).
+              --simplify-method <name>  Algorithm for --simplify: 'douglas-peucker' (default) or
+                                     'visvalingam'. Ignored without --simplify.
               --bbox minX,minY,maxX,maxY   Extent to render (PNG output only).
               --size WIDTH[xHEIGHT]  Image size in pixels (PNG output only).
               --max-dimension <pixels>  PNG only: cap the longer edge at this many pixels and derive
@@ -488,6 +555,8 @@ public static class Runner
             Examples:
               geoconvert cities.geojson cities.kml
               geoconvert roads.shp roads.fgb
+              geoconvert coastline.geojson coastline.topojson --simplify 0.01
+              geoconvert countries.geojson simplified.geojson --simplify 5 --simplify-method visvalingam
               geoconvert data.csv data.geojson --from csv
               geoconvert world.geojson europe.png --bbox -10,35,30,60 --size 1200x900
               geoconvert world.geojson world.png --projection web-mercator --size 1200

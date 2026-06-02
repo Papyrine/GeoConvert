@@ -84,6 +84,67 @@ static class SampleData
         return collection;
     }
 
+    /// <summary>
+    /// A dense graticule tiling the whole globe with small square polygons (cells of
+    /// <paramref name="cellDegrees"/>° on a side across -180..180 / -90..90). Sized so a large
+    /// fraction of cells straddle Goode's interrupt meridians and the equator, so rendering under
+    /// <see cref="MapProjection.Goode"/> drives the per-vertex lobe clip (ClipRingWithTags →
+    /// ClipHalfPlaneTagged, four Sutherland-Hodgman passes + DensifyClipEdges) and per-lobe
+    /// projection at high vertex counts. Under a non-interrupted projection the same data skips all
+    /// of that, so the Goode − PlateCarree render delta isolates the GoodeLobes polygon path.
+    /// </summary>
+    public static FeatureCollection WorldPolygons(double cellDegrees)
+    {
+        var collection = new FeatureCollection();
+        var id = 0;
+        // Inset each cell slightly so neighbours don't share edges exactly — keeps the clip from
+        // hitting only the trivial on-boundary cases and mirrors real tiled data with gaps.
+        var inset = cellDegrees * 0.1;
+        for (var lon = -180.0; lon < 180; lon += cellDegrees)
+        {
+            for (var lat = -90.0; lat < 90; lat += cellDegrees)
+            {
+                var x0 = lon + inset;
+                var y0 = lat + inset;
+                var x1 = lon + cellDegrees - inset;
+                var y1 = lat + cellDegrees - inset;
+                var polygon = new Polygon(
+                [
+                    [new(x0, y0), new(x1, y0), new(x1, y1), new(x0, y1), new(x0, y0)],
+                ]);
+                collection.Add(new Feature(polygon) { Properties = { ["id"] = (long)id++ } });
+            }
+        }
+
+        return collection;
+    }
+
+    /// <summary>
+    /// Long horizontal polylines spanning the full -180..180 longitude range, one every
+    /// <paramref name="latStep"/>° of latitude, each sampled at <paramref name="verticesPerLine"/>
+    /// points. Every line crosses all of Goode's lon interrupt meridians (and lines near the
+    /// equator straddle the hemisphere split), so rendering under <see cref="MapProjection.Goode"/>
+    /// drives the polyline boundary-split path (SubdividePath → InterpolateToBoundary) hard — the
+    /// per-crossing code whose allocation profile the MemoryDiagnoser column exposes directly.
+    /// </summary>
+    public static FeatureCollection WorldLines(double latStep, int verticesPerLine)
+    {
+        var collection = new FeatureCollection();
+        var step = 360.0 / (verticesPerLine - 1);
+        for (var lat = -88.0; lat <= 88; lat += latStep)
+        {
+            var positions = new List<Position>(verticesPerLine);
+            for (var i = 0; i < verticesPerLine; i++)
+            {
+                positions.Add(new(-180 + i * step, lat));
+            }
+
+            collection.Add(new Feature(new LineString(positions)));
+        }
+
+        return collection;
+    }
+
     /// <summary>Points carrying many attribute columns — stresses the .dbf field-inference path.</summary>
     public static FeatureCollection WidePoints(int count, int columns)
     {

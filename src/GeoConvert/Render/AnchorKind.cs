@@ -1,0 +1,1 @@
+﻿enum AnchorKind { Point, Area }

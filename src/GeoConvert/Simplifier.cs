@@ -51,7 +51,16 @@ public static class Simplifier
     /// </summary>
     public static Feature Simplify(Feature feature, double tolerance, SimplifyMethod method = SimplifyMethod.DouglasPeucker)
     {
-        var geometry = feature.Geometry is { } source ? Simplify(source, tolerance, method) : null;
+        Geometry? geometry;
+        if (feature.Geometry is { } source)
+        {
+            geometry = Simplify(source, tolerance, method);
+        }
+        else
+        {
+            geometry = null;
+        }
+
         var result = new Feature(geometry)
         {
             Id = feature.Id,
@@ -77,12 +86,24 @@ public static class Simplifier
         {
             LineString line => new LineString(SimplifyLine(line.Positions, tolerance, method)),
             Polygon polygon => SimplifyPolygon(polygon, tolerance, method),
-            MultiLineString multiLine => new MultiLineString(
-                [.. multiLine.LineStrings.Select(_ => new LineString(SimplifyLine(_.Positions, tolerance, method)))]),
-            MultiPolygon multiPolygon => new MultiPolygon(
-                [.. multiPolygon.Polygons.Select(_ => SimplifyPolygon(_, tolerance, method))]),
-            GeometryCollection collection => new GeometryCollection(
-                [.. collection.Geometries.Select(_ => Simplify(_, tolerance, method))]),
+            MultiLineString multiLine =>
+                new MultiLineString(
+                [
+                    .. multiLine.LineStrings
+                        .Select(_ => new LineString(SimplifyLine(_.Positions, tolerance, method)))
+                ]),
+            MultiPolygon multiPolygon =>
+                new MultiPolygon(
+                [
+                    .. multiPolygon.Polygons
+                        .Select(_ => SimplifyPolygon(_, tolerance, method))
+                ]),
+            GeometryCollection collection =>
+                new GeometryCollection(
+                [
+                    .. collection.Geometries
+                        .Select(_ => Simplify(_, tolerance, method))
+                ]),
             // Point, MultiPoint (and any future vertex-less geometry): nothing to thin. Returning the
             // same instance is safe — geometries are immutable — and avoids a needless copy.
             _ => geometry,

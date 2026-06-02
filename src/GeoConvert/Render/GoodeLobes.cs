@@ -138,37 +138,65 @@ static class GoodeLobes
         return false;
     }
 
+    // Reusable scratch buffers for the clip. Clipping a single ring allocates nothing: the four
+    // half-plane passes ping-pong between buffer A and buffer B, and the densify step writes into
+    // a third pair. Marked [ThreadStatic] so concurrent RenderPng calls on different threads each
+    // get their own set — within one render DrawLayer is single-threaded, so reuse across rings is
+    // safe. The returned lists ARE the densify scratch pair, so the contract is: the result of one
+    // ClipRingWithTags call is valid only until the next call on the same thread. Every caller
+    // (PreparePolygon) consumes both lists fully — copying vertices into a pixel array and reading
+    // tags via BuildStrokeChains — before the next clip, so the reuse is invisible to them.
+    [ThreadStatic] static List<Position>? scratchAVertices;
+    [ThreadStatic] static List<int>? scratchATags;
+    [ThreadStatic] static List<Position>? scratchBVertices;
+    [ThreadStatic] static List<int>? scratchBTags;
+    [ThreadStatic] static List<Position>? scratchOutVertices;
+    [ThreadStatic] static List<int>? scratchOutTags;
+
     /// <summary>Sutherland-Hodgman clip of a polygon ring against the lobe's lon/lat AABB.
     /// Returns the clipped vertices along with a bitmask per vertex indicating which lobe
     /// boundary planes the vertex was introduced by (0 = original input vertex; non-zero =
     /// intersection point on one of the four lobe boundaries). The caller uses the tags to
     /// distinguish *real* polygon edges from clip-edge segments that close the clipped piece
     /// along the lobe boundary — real edges get stroked, clip edges don't, so a clipped
-    /// continent reads as one shape rather than several with vertical slice marks inside.</summary>
+    /// continent reads as one shape rather than several with vertical slice marks inside.
+    /// <para>The returned lists are reused per-thread scratch (see the buffer fields above) and
+    /// are only valid until the next <see cref="ClipRingWithTags"/> call on the same thread.</para></summary>
     public static (List<Position> Vertices, List<int> BoundaryTags) ClipRingWithTags(IReadOnlyList<Position> ring, Rect rect)
     {
-        // Each pass is one half-plane; intersection vertices it introduces are tagged with the
-        // bit for that boundary. A vertex's tag accumulates across passes only if it gets
-        // re-intersected on a subsequent plane, which for axis-aligned planes only happens at
-        // the lobe corners — and corner-on-corner edges aren't a real concern.
-        var verts = new List<Position>(ring);
-        var tags = new List<int>(new int[ring.Count]);
-        (verts, tags) = ClipHalfPlaneTagged(verts, tags,
-            p => p.X >= rect.LonMin,
-            (a, b) => InterpolateToX(a, b, rect.LonMin),
-            introducedTag: 1);
-        (verts, tags) = ClipHalfPlaneTagged(verts, tags,
-            p => p.X <= rect.LonMax,
-            (a, b) => InterpolateToX(a, b, rect.LonMax),
-            introducedTag: 2);
-        (verts, tags) = ClipHalfPlaneTagged(verts, tags,
-            p => p.Y >= rect.LatMin,
-            (a, b) => InterpolateToY(a, b, rect.LatMin),
-            introducedTag: 4);
-        (verts, tags) = ClipHalfPlaneTagged(verts, tags,
-            p => p.Y <= rect.LatMax,
-            (a, b) => InterpolateToY(a, b, rect.LatMax),
-            introducedTag: 8);
+        var bufferAVertices = scratchAVertices ??= [];
+        var bufferATags = scratchATags ??= [];
+        var bufferBVertices = scratchBVertices ??= [];
+        var bufferBTags = scratchBTags ??= [];
+
+        // Seed buffer A with the input ring; every vertex starts tagged 0 (an original, un-clipped
+        // vertex). Manual loop rather than AddRange to avoid an enumerator allocation for the
+        // IReadOnlyList input.
+        bufferAVertices.Clear();
+        bufferATags.Clear();
+        for (var i = 0; i < ring.Count; i++)
+        {
+            bufferAVertices.Add(ring[i]);
+            bufferATags.Add(0);
+        }
+
+        // Each pass is one half-plane; intersection vertices it introduces are tagged with the bit
+        // for that boundary. A vertex's tag accumulates across passes only if it gets re-intersected
+        // on a subsequent plane, which for axis-aligned planes only happens at the lobe corners —
+        // and corner-on-corner edges aren't a real concern. The passes ping-pong A→B→A→B→A so the
+        // final result lands back in buffer A without any per-pass allocation.
+        ClipHalfPlaneTagged(
+            bufferAVertices, bufferATags, bufferBVertices, bufferBTags,
+            Axis.Longitude, rect.LonMin, keepGreater: true, introducedTag: 1);
+        ClipHalfPlaneTagged(
+            bufferBVertices, bufferBTags, bufferAVertices, bufferATags,
+            Axis.Longitude, rect.LonMax, keepGreater: false, introducedTag: 2);
+        ClipHalfPlaneTagged(
+            bufferAVertices, bufferATags, bufferBVertices, bufferBTags,
+            Axis.Latitude, rect.LatMin, keepGreater: true, introducedTag: 4);
+        ClipHalfPlaneTagged(
+            bufferBVertices, bufferBTags, bufferAVertices, bufferATags,
+            Axis.Latitude, rect.LatMax, keepGreater: false, introducedTag: 8);
 
         // Densify clip edges so the polygon's projected fill follows the lobe boundary's
         // Mollweide curve. The clip edge in lon/lat is a straight line (constant lon or lat)
@@ -178,19 +206,35 @@ static class GoodeLobes
         // intermediate vertices along the straight lon/lat line lets each be projected
         // individually, so the resulting fill edge traces the lobe's curve and there's no
         // gap between a polygon like Antarctica and the lobe outline.
-        return DensifyClipEdges(verts, tags, samplesPerEdge: 16);
+        return DensifyClipEdges(bufferAVertices, bufferATags);
     }
 
-    static (List<Position>, List<int>) DensifyClipEdges(List<Position> verts, List<int> tags, int samplesPerEdge)
+    // Bit mask of the two longitude-boundary tags (LonMin=1, LonMax=2). A clip edge on one of these
+    // planes runs along a meridian (constant lon, varying lat) and curves when projected; an edge on
+    // a latitude plane (LatMin=4, LatMax=8) runs along a parallel, which projects to a straight
+    // horizontal line in the pseudocylindrical lobe and needs no densification.
+    const int longitudeBoundaryMask = 1 | 2;
+
+    // One densify sample per this many degrees of latitude span — matches the old flat 16-samples-
+    // over-a-90°-meridian density (~5.6°/sample) without over-sampling short edges.
+    const double densifyDegreesPerSample = 6;
+
+    static (List<Position>, List<int>) DensifyClipEdges(List<Position> verts, List<int> tags)
     {
-        var output = new List<Position>(verts.Count);
-        var outputTags = new List<int>(tags.Count);
-        for (var i = 0; i < verts.Count; i++)
+        // Output goes to the dedicated scratch pair (distinct from the A/B clip buffers this reads
+        // from); returned to the caller, valid until the next ClipRingWithTags call.
+        var output = scratchOutVertices ??= [];
+        var outputTags = scratchOutTags ??= [];
+        output.Clear();
+        outputTags.Clear();
+        var count = verts.Count;
+        for (var i = 0; i < count; i++)
         {
             var current = verts[i];
-            var next = verts[(i + 1) % verts.Count];
+            var nextIndex = (i + 1) % count;
+            var next = verts[nextIndex];
             var currentTag = tags[i];
-            var nextTag = tags[(i + 1) % verts.Count];
+            var nextTag = tags[nextIndex];
             output.Add(current);
             outputTags.Add(currentTag);
 
@@ -203,9 +247,18 @@ static class GoodeLobes
                 continue;
             }
 
-            for (var j = 1; j < samplesPerEdge; j++)
+            // Latitude-plane clip edges project to a straight horizontal line (parallels don't
+            // curve), so two endpoints are exact — skip densifying them entirely. Only meridian
+            // edges curve, and the number of samples scales with the latitude span they cover.
+            if ((sharedTag & longitudeBoundaryMask) == 0)
             {
-                var t = (double)j / samplesPerEdge;
+                continue;
+            }
+
+            var samples = Math.Max(1, (int)Math.Ceiling(Math.Abs(next.Y - current.Y) / densifyDegreesPerSample));
+            for (var j = 1; j < samples; j++)
+            {
+                var t = (double)j / samples;
                 output.Add(new(
                     current.X + t * (next.X - current.X),
                     current.Y + t * (next.Y - current.Y)));
@@ -254,40 +307,73 @@ static class GoodeLobes
         yield return (currentLobe, current);
     }
 
-    static (List<Position>, List<int>) ClipHalfPlaneTagged(
-        IReadOnlyList<Position> ring,
-        IReadOnlyList<int> ringTags,
-        Func<Position, bool> inside,
-        Func<Position, Position, Position> intersect,
+    // Which coordinate a half-plane bounds. Each lobe AABB is clipped by two longitude planes and
+    // two latitude planes, so the plane is fully described by an axis + threshold + direction —
+    // no per-plane delegate needed.
+    enum Axis
+    {
+        Longitude,
+        Latitude,
+    }
+
+    // Clips one axis-aligned half-plane, reading the ring from the source buffers and writing the
+    // kept/intersection vertices into the (cleared) destination buffers. No allocation and no
+    // delegate indirection — the plane is described by <paramref name="axis"/> (which coordinate it
+    // bounds), <paramref name="threshold"/> (the bound), and <paramref name="keepGreater"/> (keep
+    // the side at/above the threshold, vs at/below). The caller supplies both buffer pairs and
+    // ping-pongs them across the four passes.
+    static void ClipHalfPlaneTagged(
+        List<Position> sourceVertices,
+        List<int> sourceTags,
+        List<Position> destinationVertices,
+        List<int> destinationTags,
+        Axis axis,
+        double threshold,
+        bool keepGreater,
         int introducedTag)
     {
-        var verts = new List<Position>();
-        var tags = new List<int>();
-        if (ring.Count == 0)
+        destinationVertices.Clear();
+        destinationTags.Clear();
+        var count = sourceVertices.Count;
+        if (count == 0)
         {
-            return (verts, tags);
+            return;
         }
 
-        for (var i = 0; i < ring.Count; i++)
+        for (var i = 0; i < count; i++)
         {
-            var current = ring[i];
-            var previous = ring[(i + ring.Count - 1) % ring.Count];
-            var currentInside = inside(current);
-            var previousInside = inside(previous);
+            var current = sourceVertices[i];
+            var previous = sourceVertices[(i + count - 1) % count];
+            var currentInside = Inside(current, axis, threshold, keepGreater);
+            var previousInside = Inside(previous, axis, threshold, keepGreater);
             if (previousInside != currentInside)
             {
-                verts.Add(intersect(previous, current));
-                tags.Add(introducedTag);
+                destinationVertices.Add(Intersect(previous, current, axis, threshold));
+                destinationTags.Add(introducedTag);
             }
 
             if (currentInside)
             {
-                verts.Add(current);
-                tags.Add(ringTags[i]);
+                destinationVertices.Add(current);
+                destinationTags.Add(sourceTags[i]);
             }
         }
+    }
 
-        return (verts, tags);
+    static bool Inside(Position position, Axis axis, double threshold, bool keepGreater)
+    {
+        var value = axis == Axis.Longitude ? position.X : position.Y;
+        return keepGreater ? value >= threshold : value <= threshold;
+    }
+
+    static Position Intersect(Position a, Position b, Axis axis, double threshold)
+    {
+        if (axis == Axis.Longitude)
+        {
+            return InterpolateToX(a, b, threshold);
+        }
+
+        return InterpolateToY(a, b, threshold);
     }
 
     /// <summary>Walks a clipped ring and yields the maximal runs of consecutive non-clip edges

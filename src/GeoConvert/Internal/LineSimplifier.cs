@@ -12,7 +12,8 @@ static class LineSimplifier
     /// Simplifies <paramref name="points"/> with the chosen <paramref name="method"/>, never returning
     /// fewer than <paramref name="minPoints"/> vertices (2 for an open line, 4 for a closed ring — a
     /// triangle plus its closing vertex). Inputs already at or below that floor are returned unchanged,
-    /// and a Douglas–Peucker pass that would collapse below it falls back to the original.
+    /// and a Douglas–Peucker pass that would collapse a ring below it is reduced to a minimal valid
+    /// triangle (see <see cref="MinimalRing"/>) rather than restored to full detail.
     /// </summary>
     public static IReadOnlyList<Position> Simplify(IReadOnlyList<Position> points, double tolerance, SimplifyMethod method, int minPoints)
     {
@@ -28,9 +29,73 @@ static class LineSimplifier
             _ => throw new GeoConvertException($"Unknown simplify method '{method}'."),
         };
 
-        // Visvalingam stops at minPoints by construction; Douglas–Peucker can collapse a tiny shape to
-        // its two (coincident, for a ring) endpoints under a large tolerance, so guard the floor here.
-        return simplified.Count < minPoints ? points : simplified;
+        if (simplified.Count >= minPoints)
+        {
+            return simplified;
+        }
+
+        // The pass collapsed the shape below the minimum valid vertex count. Open lines (minPoints 2)
+        // always keep their two endpoints, so this only happens for a closed ring (minPoints 4) whose
+        // whole extent fell within the tolerance. Returning the original would *restore full detail* —
+        // the opposite of simplifying — and for data full of sub-tolerance rings (island chains) that
+        // inverts the contract: a larger tolerance would yield a *larger* output. Instead reduce the
+        // ring to its minimal valid form: the triangle spanned by its three most extreme vertices.
+        return MinimalRing(points) ?? points;
+    }
+
+    /// <summary>
+    /// Builds the smallest valid closed ring that still spans <paramref name="points"/>'s extent — the
+    /// triangle through its first vertex, the vertex farthest from it, and the vertex farthest from that
+    /// chord — emitted in original traversal order so the ring's winding is preserved. Returns null when
+    /// no non-degenerate triangle exists (every vertex coincident or collinear), leaving the caller to
+    /// keep the already-degenerate original rather than fabricate a zero-area ring.
+    /// </summary>
+    static List<Position>? MinimalRing(IReadOnlyList<Position> points)
+    {
+        var anchor = points[0];
+
+        var farthest = 0;
+        var maxFromAnchor = 0d;
+        for (var i = 1; i < points.Count; i++)
+        {
+            var dx = points[i].X - anchor.X;
+            var dy = points[i].Y - anchor.Y;
+            var distance = dx * dx + dy * dy;
+            if (distance > maxFromAnchor)
+            {
+                maxFromAnchor = distance;
+                farthest = i;
+            }
+        }
+
+        if (farthest == 0)
+        {
+            // Every vertex coincides with the first — there is no extent to span.
+            return null;
+        }
+
+        var apex = 0;
+        var maxFromChord = 0d;
+        for (var i = 1; i < points.Count; i++)
+        {
+            var distance = PerpendicularDistanceSquared(points[i], anchor, points[farthest]);
+            if (distance > maxFromChord)
+            {
+                maxFromChord = distance;
+                apex = i;
+            }
+        }
+
+        if (apex == 0)
+        {
+            // Collinear: no third vertex sits off the chord, so no triangle has area.
+            return null;
+        }
+
+        // Order the two chosen vertices by their original index so the reduced ring traverses the same
+        // way as the source (the anchor is index 0, ahead of both); closure repeats the anchor.
+        var (second, third) = farthest < apex ? (farthest, apex) : (apex, farthest);
+        return [anchor, points[second], points[third], anchor];
     }
 
     static List<Position> DouglasPeucker(IReadOnlyList<Position> points, double tolerance)

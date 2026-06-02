@@ -94,11 +94,44 @@ public class SimplifyTests
     }
 
     [Test]
-    public async Task Polygon_ring_too_aggressive_falls_back_to_original()
+    public async Task Polygon_ring_too_aggressive_reduces_to_minimal_triangle()
     {
-        // A tolerance that would collapse the ring below a triangle leaves it untouched, so the
-        // polygon stays valid rather than degenerating.
+        // A tolerance that would collapse the ring below a triangle reduces it to its minimal valid
+        // form — the triangle through the three most extreme vertices — instead of restoring full
+        // detail. Restoring the original would invert the contract: a larger tolerance must never
+        // produce a larger result (it does for data full of sub-tolerance rings otherwise).
         var ring = new[] { new Position(0, 0), new(4, 0), new(4, 4), new(0, 4), new(0, 0) };
+        var polygon = new Polygon([ring]);
+        var result = (Polygon)Simplifier.Simplify(polygon, 1000);
+        var reduced = result.Rings[0];
+        // Triangle plus its closing vertex, still closed, every vertex drawn from the original ring.
+        await Assert.That(reduced.Count).IsEqualTo(4);
+        await Assert.That(reduced[0]).IsEqualTo(reduced[^1]);
+        await Assert.That(reduced.All(ring.Contains)).IsTrue();
+        // Original traversal order is kept (winding preserved): indices ascend from the anchor.
+        await Assert.That(reduced[0]).IsEqualTo(new Position(0, 0));
+        await Assert.That(reduced[1]).IsEqualTo(new Position(4, 0));
+        await Assert.That(reduced[2]).IsEqualTo(new Position(4, 4));
+    }
+
+    [Test]
+    public async Task Polygon_ring_with_no_extent_falls_back_to_original()
+    {
+        // Every vertex coincides, so there is no triangle to span the extent. The ring can't be made
+        // smaller while staying valid, so the (already degenerate) original is kept untouched.
+        var ring = new[] { new Position(2, 2), new(2, 2), new(2, 2), new(2, 2), new(2, 2) };
+        var polygon = new Polygon([ring]);
+        var result = (Polygon)Simplifier.Simplify(polygon, 1000);
+        await Assert.That(result.Rings[0].Count).IsEqualTo(5);
+    }
+
+    [Test]
+    public async Task Polygon_ring_fully_collinear_falls_back_to_original()
+    {
+        // All vertices lie on one line: the farthest-from-chord search finds nothing off it, so no
+        // triangle has area. The collinear (degenerate) ring is left as-is rather than fabricated into
+        // a zero-area triangle.
+        var ring = new[] { new Position(0, 0), new(1, 0), new(2, 0), new(3, 0), new(0, 0) };
         var polygon = new Polygon([ring]);
         var result = (Polygon)Simplifier.Simplify(polygon, 1000);
         await Assert.That(result.Rings[0].Count).IsEqualTo(5);

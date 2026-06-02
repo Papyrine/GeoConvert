@@ -72,6 +72,14 @@ Hub-and-spoke around one in-memory model:
   `Write(Stream, FeatureCollection)` (plus `*String`/`*Bytes` helpers). Exceptions: `Shapefile` is
   path-based (it spans `.shp`/`.shx`/`.dbf`/`.prj`); `MapRenderer` (in `MapImage.cs`) is write-only PNG
   via `RenderOptions`.
+- **Simplification** (`Simplifier.cs`): two entry points for lossy vertex reduction. `Simplify` thins
+  each ring/line independently (Douglas–Peucker or Visvalingam — see `LineSimplifier` for the
+  algorithms); `SimplifyTopology` does a junction-detection pass across the entire collection first,
+  splits each ring at its junctions, and simplifies each shared arc once so adjacent polygons that
+  share a border stay seamlessly joined (no hairline gaps / alpha-stacked overlaps along internal
+  borders). Pick `SimplifyTopology` for topologically consistent datasets — Natural Earth admin
+  layers, contour pairs; the plain one for standalone geometries. CLI: `--simplify-topology` is a
+  modifier on `--simplify`. The web sample world map is built this way (see `GeoConvert.Web.csproj`).
 - **Hand-rolled internals** (`src/GeoConvert/Internal/`) exist because of the no-dependency rule:
   `FlatBufferBuilder`/`FlatBufferTable` (FlatGeobuf's FlatBuffers wire format), `Dbf` (dBASE attribute
   table), `WktParser`, `CsvParser`, `Png` (encoder, uses BCL `ZLibStream` + `System.IO.Hashing.Crc32`),

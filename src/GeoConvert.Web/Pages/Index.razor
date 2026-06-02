@@ -1,5 +1,6 @@
 @page "/"
 @inject FileDownloadService FileDownloadService
+@inject HttpClient Http
 @inject IJSRuntime JsRuntime
 
 <PageTitle>GeoConvert — Map Format Converter</PageTitle>
@@ -22,6 +23,14 @@
             </span>
             <InputFile id="map-file" OnChange="OnFileSelected" class="file-input" accept="@ConversionService.ReadableAccept" />
         </label>
+
+        <div class="upload-or"><span>or</span></div>
+
+        @* Loads a world map bundled at build time from MapBundle.World (country borders, Douglas–Peucker
+           simplified) — fetched on demand so it only downloads when asked, never at app startup. *@
+        <button class="sample-btn" @onclick="LoadSampleWorldMap" disabled="@isBusy">
+            🌍 View sample world map
+        </button>
     </div>
 
     @if (errorMessage is not null)
@@ -31,12 +40,14 @@
 
     @* The read phase happens before the convert panel exists, so its progress shows here. The render
        preview shows its bar in the preview slot, and the download (write/render) shows its bar under the
-       Download button — each next to the action that triggered it. Reading is indeterminate: the
-       uploaded file is already in memory, so its byte fraction hits 100% instantly and the real work
-       (parsing, building features) carries on behind it — an animated bar shows that's still happening. *@
+       Download button — each next to the action that triggered it. Reading is indeterminate: an uploaded
+       file is already in memory, so its byte fraction hits 100% instantly and the real work (parsing,
+       building features) carries on behind it — an animated bar shows that's still happening. The sample
+       map's network download is the exception: its byte total is known up front (Content-Length), so that
+       phase fills the bar proportionally (isDownloading), then flips to the indeterminate parse. *@
     @if (isBusy && !isRendering && features is null)
     {
-        <ConversionProgress Label="@progressLabel" Report="progressReport" Indeterminate="true" />
+        <ConversionProgress Label="@progressLabel" Report="progressReport" Indeterminate="@(!isDownloading)" />
     }
 
     @if (features is not null)
@@ -139,6 +150,7 @@
     int maxDimension = 2048;
     bool isBusy;
     bool isRendering;
+    bool isDownloading;
     ConvertProgress? progressReport;
     string? progressLabel;
     IProgress<ConvertProgress>? progress;
@@ -228,6 +240,71 @@
         {
             isBusy = false;
         }
+    }
+
+    // Loads the world map bundled as a static web asset at /sample/world.fgb (built from MapBundle.World
+    // and simplified at build time). The multi-MB download is streamed with a determinate progress bar
+    // (its size is known up front), then the read/render reuse the same off-thread pipeline as an uploaded
+    // file, so progress and preview behave identically once the bytes are in memory.
+    async Task LoadSampleWorldMap()
+    {
+        Reset();
+        sourceName = "world.fgb";
+        sourceFormat = ConversionService.Find(GeoFormat.FlatGeobuf);
+
+        try
+        {
+            isDownloading = true;
+            BeginPhase("Downloading sample world map…");
+            var bytes = await DownloadSampleAsync("sample/world.fgb");
+            isDownloading = false;
+
+            BeginPhase("Reading map…");
+            features = await Task.Run(() => ConversionService.Read(bytes, GeoFormat.FlatGeobuf, progress));
+            featureCount = features.Count;
+            await RefreshPreviewAsync();
+        }
+        catch (Exception exception)
+        {
+            ReportError("Could not load the sample world map", exception);
+            features = null;
+        }
+        finally
+        {
+            isDownloading = false;
+            isBusy = false;
+        }
+    }
+
+    // Streams the sample map from its static-asset URL, reporting bytes-read against Content-Length so the
+    // bar fills as the world map downloads. Browser response streaming is opted in so the WASM HttpClient
+    // yields chunks as they arrive instead of buffering the whole body first — without it ReadAsync would
+    // only return once the full file is in memory and the bar would jump straight to 100%. Reports flow
+    // through the same IProgress as a read, so the ConversionProgress component renders them unchanged.
+    async Task<byte[]> DownloadSampleAsync(string url)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.SetBrowserResponseStreamingEnabled(true);
+        using var response = await Http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead);
+        response.EnsureSuccessStatusCode();
+
+        var total = response.Content.Headers.ContentLength;
+        using var body = await response.Content.ReadAsStreamAsync();
+        using var buffer = total is > 0 and <= int.MaxValue
+            ? new MemoryStream((int) total.Value)
+            : new MemoryStream();
+
+        var chunk = new byte[64 * 1024];
+        long read = 0;
+        int count;
+        while ((count = await body.ReadAsync(chunk)) > 0)
+        {
+            buffer.Write(chunk, 0, count);
+            read += count;
+            progress?.Report(new ConvertProgress(ProgressPhase.Reading, 0, null, read, total));
+        }
+
+        return buffer.ToArray();
     }
 
     // Rendering a large map is CPU-bound. With the multithreaded runtime it runs on a background thread
@@ -341,6 +418,7 @@
         previewDataUrl = null;
         isBusy = false;
         isRendering = false;
+        isDownloading = false;
         progressReport = null;
         progressLabel = null;
     }

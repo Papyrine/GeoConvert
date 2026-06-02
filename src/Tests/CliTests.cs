@@ -46,6 +46,27 @@ public class CliTests
     }
 
     [Test]
+    public async Task ConvertsWithSimplifyTopology()
+    {
+        // --simplify-topology routes through the shared-boundary variant of Simplifier (proven by
+        // its own tests). The CLI test just confirms the flag is wired into the pipeline — the
+        // converted output exists and isn't empty.
+        using var directory = new TempDirectory();
+
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.geojson");
+
+        var code = Runner.Run(
+            [input, output, "--simplify", "0.5", "--simplify-topology"],
+            new StringWriter(),
+            new StringWriter());
+
+        await Assert.That(code).IsEqualTo(0);
+        await Assert.That(new FileInfo(output).Length > 0).IsTrue();
+    }
+
+    [Test]
     public async Task MissingInputReturnsError()
     {
         var error = new StringWriter();

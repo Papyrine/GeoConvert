@@ -109,6 +109,106 @@ public static class Simplifier
             _ => geometry,
         };
 
+    /// <summary>
+    /// Topology-preserving variant of <see cref="Simplify(FeatureCollection, double, SimplifyMethod)"/>.
+    /// Per-feature <see cref="Simplify(FeatureCollection, double, SimplifyMethod)"/> reduces every ring
+    /// independently — so two adjacent polygons that share a border get that border simplified by
+    /// different chord choices, and the results no longer line up, leaving hairline gaps (or
+    /// alpha-stacking overlaps when the fill is translucent) along every shared edge. This overload
+    /// avoids that: it classifies <em>junctions</em> (vertices whose neighbours differ across chains)
+    /// across the whole collection tree, splits each chain at its junctions into arcs, and runs the
+    /// chosen algorithm on each arc once. Two rings that share an arc see bit-identical simplified
+    /// vertices for that arc — adjacent country/state polygons stay seamlessly joined.
+    /// <para>
+    /// Same usage and tolerance units as the plain overload; the cost is one extra pass over every
+    /// vertex (junction analysis) plus the dictionary that drives the rebuild — typically a small
+    /// fraction of the simplification time itself on real datasets. Points and multi-points pass
+    /// through unchanged. Pick this overload for topologically consistent datasets (e.g. Natural
+    /// Earth admin layers) where the per-feature variant's gaps/overlaps would show up at low
+    /// stroke widths or with translucent fills; the plain overload is fine when each feature stands
+    /// on its own and shared boundaries aren't a concern.
+    /// </para>
+    /// </summary>
+    public static FeatureCollection SimplifyTopology(FeatureCollection collection, double tolerance, SimplifyMethod method = SimplifyMethod.DouglasPeucker)
+    {
+        var replacements = TopologySimplifier.BuildReplacements(collection, tolerance, method);
+        return RebuildCollection(collection, replacements);
+    }
+
+    static FeatureCollection RebuildCollection(
+        FeatureCollection source,
+        Dictionary<IReadOnlyList<Position>, IReadOnlyList<Position>> replacements)
+    {
+        var result = new FeatureCollection
+        {
+            Name = source.Name,
+        };
+
+        foreach (var pair in source.Properties)
+        {
+            result.Properties[pair.Key] = pair.Value;
+        }
+
+        foreach (var feature in source.Features)
+        {
+            var geometry = feature.Geometry is { } source_ ? RebuildGeometry(source_, replacements) : null;
+            var rebuilt = new Feature(geometry)
+            {
+                Id = feature.Id,
+            };
+            foreach (var pair in feature.Properties)
+            {
+                rebuilt.Properties[pair.Key] = pair.Value;
+            }
+
+            result.Features.Add(rebuilt);
+        }
+
+        foreach (var child in source.Children)
+        {
+            result.Children.Add(RebuildCollection(child, replacements));
+        }
+
+        return result;
+    }
+
+    static Geometry RebuildGeometry(
+        Geometry geometry,
+        Dictionary<IReadOnlyList<Position>, IReadOnlyList<Position>> replacements) =>
+        geometry switch
+        {
+            LineString line => new LineString(replacements[line.Positions]),
+            MultiLineString multi => new MultiLineString(
+            [
+                .. multi.LineStrings.Select(_ => new LineString(replacements[_.Positions]))
+            ]),
+            Polygon polygon => new Polygon(RebuildRings(polygon, replacements)),
+            MultiPolygon multi => new MultiPolygon(
+            [
+                .. multi.Polygons.Select(_ => new Polygon(RebuildRings(_, replacements)))
+            ]),
+            GeometryCollection collection => new GeometryCollection(
+            [
+                .. collection.Geometries.Select(_ => RebuildGeometry(_, replacements))
+            ]),
+            // Point, MultiPoint, anything else: no rings/lines to swap; pass the same instance
+            // through. Geometries are immutable so sharing is safe.
+            _ => geometry,
+        };
+
+    static IReadOnlyList<IReadOnlyList<Position>> RebuildRings(
+        Polygon polygon,
+        Dictionary<IReadOnlyList<Position>, IReadOnlyList<Position>> replacements)
+    {
+        var rings = new List<IReadOnlyList<Position>>(polygon.Rings.Count);
+        foreach (var ring in polygon.Rings)
+        {
+            rings.Add(replacements[ring]);
+        }
+
+        return rings;
+    }
+
     static Polygon SimplifyPolygon(Polygon polygon, double tolerance, SimplifyMethod method)
     {
         var rings = new List<IReadOnlyList<Position>>(polygon.Rings.Count);

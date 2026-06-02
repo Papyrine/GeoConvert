@@ -24,6 +24,28 @@ public class CliTests
     }
 
     [Test]
+    [Arguments("douglas-peucker")]
+    [Arguments("dp")]
+    [Arguments("visvalingam")]
+    [Arguments("VW")]
+    public async Task ConvertsWithSimplify(string method)
+    {
+        using var directory = new TempDirectory();
+
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Mixed()));
+        var output = Path.Combine(directory, "out.geojson");
+
+        var code = Runner.Run(
+            [input, output, "--simplify", "0.5", "--simplify-method", method],
+            new StringWriter(),
+            new StringWriter());
+
+        await Assert.That(code).IsEqualTo(0);
+        await Assert.That(File.Exists(output)).IsTrue();
+    }
+
+    [Test]
     public async Task MissingInputReturnsError()
     {
         var error = new StringWriter();
@@ -162,6 +184,11 @@ public class CliTests
     [Arguments(new[] { "a", "b", "--label-halo", "red" }, 2)]
     [Arguments(new[] { "a", "b", "--label-knockout" }, 2)]
     [Arguments(new[] { "a", "b", "--label-knockout", "red" }, 2)]
+    [Arguments(new[] { "a", "b", "--simplify" }, 2)]
+    [Arguments(new[] { "a", "b", "--simplify", "0" }, 2)]
+    [Arguments(new[] { "a", "b", "--simplify", "abc" }, 2)]
+    [Arguments(new[] { "a", "b", "--simplify-method" }, 2)]
+    [Arguments(new[] { "a", "b", "--simplify-method", "nope" }, 2)]
     [Arguments(new[] { "--unknown" }, 2)]
     public async Task InvalidArguments(string[] args, int expected) =>
         await Assert.That(Runner.Run(args, new StringWriter(), new StringWriter())).IsEqualTo(expected);

@@ -92,6 +92,31 @@ static class Snippets
         #endregion
     }
 
+    public static void Simplify()
+    {
+        #region Simplify
+
+        // Reduce vertex count before writing — the highest-leverage way to shrink dense vector data.
+        // Simplifier.Simplify returns a NEW collection (the input is left untouched), preserving layer
+        // names, properties, feature ids and structure; only line and polygon-ring vertices are thinned.
+        var collection = GeoConverter.Read("coastline.geojson");
+
+        // Douglas–Peucker (the default): tolerance is a perpendicular distance in coordinate units
+        // (degrees for WGS84). Vertices within that distance of the retained line are dropped.
+        var coarse = Simplifier.Simplify(collection, 0.01);
+        GeoConverter.Write(coarse, "coastline.topojson");
+
+        // Visvalingam–Whyatt: tolerance is an effective triangle area (degrees²) — tends to give a
+        // smoother, more evenly generalised outline. Points pass through untouched; polygon rings stay
+        // closed and never collapse below a triangle, so the result is always valid.
+        var smooth = Simplifier.Simplify(collection, 0.0001, SimplifyMethod.Visvalingam);
+        GeoConverter.Write(smooth, "coastline-vw.geojson");
+
+        #endregion
+
+        Console.WriteLine(coarse.Count + smooth.Count);
+    }
+
     public static void Progress()
     {
         #region Progress

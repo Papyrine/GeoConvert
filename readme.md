@@ -87,6 +87,34 @@ var geoJson = GeoJson.WriteString(collection);
 <sup><a href='/src/Tests/Snippets.cs#L38-L52' title='Snippet source file'>snippet source</a> | <a href='#snippet-BuildModel' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
+
+### Simplify (vertex reduction)
+
+`Simplifier.Simplify` thins line and polygon-ring vertices with either [**Douglas–Peucker**](https://en.wikipedia.org/wiki/Ramer%E2%80%93Douglas%E2%80%93Peucker_algorithm) (tolerance is a perpendicular distance in coordinate units) or [**Visvalingam–Whyatt**](https://en.wikipedia.org/wiki/Visvalingam%E2%80%93Whyatt_algorithm) (tolerance is an effective triangle area). It returns a new collection — names, layer properties, feature ids and tree structure are preserved; points pass through untouched and polygon rings stay closed and valid (never collapsing below a triangle). On the command line it's `--simplify <tolerance> [--simplify-method douglas-peucker|visvalingam]`:
+
+<!-- snippet: Simplify -->
+<a id='snippet-Simplify'></a>
+```cs
+// Reduce vertex count before writing — the highest-leverage way to shrink dense vector data.
+// Simplifier.Simplify returns a NEW collection (the input is left untouched), preserving layer
+// names, properties, feature ids and structure; only line and polygon-ring vertices are thinned.
+var collection = GeoConverter.Read("coastline.geojson");
+
+// Douglas–Peucker (the default): tolerance is a perpendicular distance in coordinate units
+// (degrees for WGS84). Vertices within that distance of the retained line are dropped.
+var coarse = Simplifier.Simplify(collection, 0.01);
+GeoConverter.Write(coarse, "coastline.topojson");
+
+// Visvalingam–Whyatt: tolerance is an effective triangle area (degrees²) — tends to give a
+// smoother, more evenly generalised outline. Points pass through untouched; polygon rings stay
+// closed and never collapse below a triangle, so the result is always valid.
+var smooth = Simplifier.Simplify(collection, 0.0001, SimplifyMethod.Visvalingam);
+GeoConverter.Write(smooth, "coastline-vw.geojson");
+```
+<sup><a href='/src/Tests/Snippets.cs#L97-L115' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
+
+
 ### Progress
 
 `Read`, `Write` and `Convert` each accept an optional `IProgress<ConvertProgress>`; PNG rendering takes one via `RenderOptions.Progress`. Each report carries both a feature count and a byte count (`ConvertProgress.Fraction` picks whichever total is known — features on write, bytes on a seekable read — and is null when the operation is genuinely indeterminate). `Convert` reports its read half under `ProgressPhase.Reading` and its write half under `ProgressPhase.Writing`:
@@ -111,7 +139,7 @@ GeoConverter.Convert("countries.geojson", "countries.fgb", progress);
 var features = GeoConverter.Read("countries.geojson");
 MapRenderer.RenderPng(features, "world.png", new() { Progress = progress });
 ```
-<sup><a href='/src/Tests/Snippets.cs#L97-L116' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L122-L141' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -134,7 +162,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L121-L135' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L146-L160' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 `RenderOptions` controls the extent (`Bounds`), pixel `Width`/`Height` (height is derived from the aspect ratio when left at 0), `Padding`, and the `Background`/`Stroke`/`Fill` colors. From the command line, output a `.png` and pass `--bbox` and `--size`:
@@ -176,7 +204,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L384-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L409-L424' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -202,7 +230,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L404-L418' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L429-L443' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -231,7 +259,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L423-L442' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L448-L467' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -290,7 +318,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(basemap, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L140-L184' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L165-L209' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 When the layers come from independent sources (typically a basemap file plus an overlay file), pass the collections as a list — they render in order, first under, last on top. Each `FeatureCollection` is a top-level layer for `RenderOptions.LayerStyle`, and the rendered extent defaults to the union of every input's bounds:
@@ -328,7 +356,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L189-L221' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L214-L246' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -374,7 +402,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L289-L315' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L314-L340' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -411,7 +439,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L320-L347' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L345-L372' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -477,7 +505,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/src/Tests/Snippets.cs#L226-L284' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L251-L309' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -519,7 +547,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/src/Tests/Snippets.cs#L354-L379' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L379-L404' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -545,9 +573,11 @@ Formats are detected from the file extensions; `--from`/`--to` override that. Ex
 geoconvert cities.geojson cities.kml
 geoconvert roads.shp roads.fgb
 geoconvert data.csv data.geojson --from csv
+geoconvert coastline.geojson coastline.topojson --simplify 0.01
+geoconvert countries.geojson simplified.geojson --simplify 5 --simplify-method visvalingam
 ```
 
-Run `geoconvert --list` to see the supported format names, or `geoconvert --help` for usage.
+`--simplify <tolerance>` reduces vertices before writing (lossy line generalisation); `--simplify-method` picks `douglas-peucker` (default) or `visvalingam`. Run `geoconvert --list` to see the supported format names, or `geoconvert --help` for usage.
 
 
 ## Model

@@ -32,3 +32,6 @@ Thumbs.db
 /BenchmarkAfter
 /.claude
 /BenchmarkBaseline
+
+# Generated at build time from MapBundle.World (see GeoConvert.Web.csproj)
+src/GeoConvert.Web/wwwroot/sample/

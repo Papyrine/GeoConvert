@@ -44,19 +44,28 @@
     </ItemGroup>
   </Target>
 
+  <!-- The default Content glob also matches the generated file (it's staged under wwwroot below); drop it
+       here so the target is the single source of that Content item, avoiding NETSDK1022 duplicate-item
+       errors on incremental builds where the file already exists at evaluation. -->
+  <ItemGroup>
+    <Content Remove="wwwroot\sample\world.fgb" />
+  </ItemGroup>
+
   <!-- _MapBundleConvert (BeforeTargets=AssignTargetPaths) writes the simplified borders.fgb into the
-       intermediate dir and surfaces it as @(_MapBundleConverted). Register that file as a Content item
-       linked under wwwroot so ResolveProjectStaticWebAssets (also BeforeTargets=AssignTargetPaths)
-       picks it up and serves it at /sample/world.fgb. -->
+       intermediate dir and surfaces it as @(_MapBundleConverted). Stage it physically under wwwroot and
+       register it as Content so ResolveProjectStaticWebAssets (also BeforeTargets=AssignTargetPaths)
+       serves it at /sample/world.fgb. It MUST live under wwwroot, not just be linked there: a linked file
+       outside wwwroot publishes fine (it's copied) but the dev server records its ContentRoot as wwwroot
+       while the bytes sit in obj, so a GET returns 200 with an empty body. -->
   <Target Name="_BundleWorldSampleMap"
           AfterTargets="_MapBundleConvert"
           BeforeTargets="ResolveProjectStaticWebAssets"
           Condition="'@(_MapBundleConverted)' != ''">
+    <Copy SourceFiles="@(_MapBundleConverted->WithMetadataValue('Filename', 'borders'))"
+          DestinationFiles="$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb"
+          SkipUnchangedFiles="true" />
     <ItemGroup>
-      <Content Include="@(_MapBundleConverted)" Condition="'%(_MapBundleConverted.Filename)' == 'borders'">
-        <Link>wwwroot\sample\world.fgb</Link>
-        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-      </Content>
+      <Content Include="$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb" />
     </ItemGroup>
   </Target>
 

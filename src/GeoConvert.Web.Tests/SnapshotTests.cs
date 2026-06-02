@@ -152,6 +152,41 @@ public class SnapshotTests
         await Assert.That(source).StartsWith("data:image/png");
     }
 
+    // The sample map's download size is known up front (Content-Length), so its phase shows a determinate
+    // progress bar that fills as bytes arrive (unlike the indeterminate parse). Throttle the transfer via
+    // CDP so it spans several seconds, making the determinate fill and its byte-ratio label observable
+    // before the preview renders.
+    [Test]
+    public async Task SampleWorldMapShowsDownloadProgress()
+    {
+        var page = await browser!.NewPageAsync();
+        await page.GotoAsync($"http://localhost:{port}/");
+        await SettleAsync(page);
+
+        var cdp = await page.Context.NewCDPSessionAsync(page);
+        await cdp.SendAsync("Network.enable");
+        await cdp.SendAsync("Network.emulateNetworkConditions", new Dictionary<string, object>
+        {
+            ["offline"] = false,
+            ["latency"] = 0,
+            ["downloadThroughput"] = 4 * 1024 * 1024,
+            ["uploadThroughput"] = 4 * 1024 * 1024,
+        });
+
+        await page.ClickAsync(".sample-btn");
+
+        // The determinate fill (not the indeterminate variant) appears while bytes stream in.
+        await page.WaitForSelectorAsync(".progress-fill:not(.progress-fill-indeterminate)", new() { Timeout = 20000 });
+
+        // Its label names the download phase and carries a byte-ratio detail (e.g. "1.2 / 19.4 MB").
+        var label = await page.TextContentAsync(".progress-label");
+        await Assert.That(label).Contains("Downloading");
+        await Assert.That(label).Contains("MB");
+
+        // And the load still completes to a rendered preview afterwards.
+        await page.WaitForSelectorAsync(".preview img", new() { Timeout = 60000 });
+    }
+
     // The Download button runs the actual write/render conversion (off the UI thread) and then hands the
     // bytes to the browser. Confirm clicking it converts and triggers a file download.
     [Test]

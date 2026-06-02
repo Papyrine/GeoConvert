@@ -112,9 +112,19 @@ static class Snippets
         var smooth = Simplifier.Simplify(collection, 0.0001, SimplifyMethod.Visvalingam);
         GeoConverter.Write(smooth, "coastline-vw.geojson");
 
+        // SimplifyTopology: same algorithms, but adjacent polygons that share a border get that
+        // border simplified once — so the two sides stay seamlessly joined. The plain overload thins
+        // each ring independently; two countries' shared edges then get different chord choices and
+        // no longer line up, leaving hairline gaps (visible as white stripes between countries) or
+        // alpha-stacked overlaps when the fill is translucent. Pick this for topologically
+        // consistent datasets like Natural Earth admin layers where shared boundaries matter.
+        var countries = GeoConverter.Read("countries.geojson");
+        var topo = Simplifier.SimplifyTopology(countries, 0.05);
+        GeoConverter.Write(topo, "countries-thin.fgb");
+
         #endregion
 
-        Console.WriteLine(coarse.Count + smooth.Count);
+        Console.WriteLine(coarse.Count + smooth.Count + topo.Count);
     }
 
     public static void Progress()

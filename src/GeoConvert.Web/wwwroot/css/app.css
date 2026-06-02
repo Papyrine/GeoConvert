@@ -177,6 +177,51 @@ header p {
     border: 0;
 }
 
+.upload-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+
+.upload-or {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: var(--muted-color);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.upload-or::before,
+.upload-or::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border-color);
+}
+
+.sample-btn {
+    padding: 0.75rem 1.5rem;
+    border: 1px solid var(--border-color);
+    background: var(--surface-color);
+    color: var(--text-color);
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.sample-btn:hover:not(:disabled) {
+    border-color: var(--primary-color);
+}
+
+.sample-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .preview {
     background: var(--surface-color);
     border: 1px solid var(--border-color);

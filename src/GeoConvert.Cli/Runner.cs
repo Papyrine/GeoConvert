@@ -38,6 +38,7 @@ public static class Runner
         var projection = MapProjection.Auto;
         double? simplifyTolerance = null;
         var simplifyMethod = SimplifyMethod.DouglasPeucker;
+        var simplifyTopology = false;
         string? labelProperty = null;
         double? labelSize = null;
         Rgba? labelColor = null;
@@ -143,6 +144,12 @@ public static class Runner
                         return 2;
                     }
 
+                    break;
+                case "--simplify-topology":
+                    // Modifier on --simplify: switches the per-feature simplification to the
+                    // shared-boundary variant so adjacent polygons stay seamlessly joined after
+                    // thinning (no hairline gaps or alpha-stacked overlaps along shared edges).
+                    simplifyTopology = true;
                     break;
                 case "--label":
                     if (i + 1 >= args.Length)
@@ -290,7 +297,9 @@ public static class Runner
             var features = GeoConverter.Read(input, fromFormat);
             if (simplifyTolerance is { } simplifyValue)
             {
-                features = Simplifier.Simplify(features, simplifyValue, simplifyMethod);
+                features = simplifyTopology
+                    ? Simplifier.SimplifyTopology(features, simplifyValue, simplifyMethod)
+                    : Simplifier.Simplify(features, simplifyValue, simplifyMethod);
             }
 
             if (toFormat == GeoFormat.Png)
@@ -523,6 +532,12 @@ public static class Runner
                                      Points pass through; polygons stay valid (closed, >= a triangle).
               --simplify-method <name>  Algorithm for --simplify: 'douglas-peucker' (default) or
                                      'visvalingam'. Ignored without --simplify.
+              --simplify-topology    Preserve shared boundaries: with two adjacent polygons that
+                                     share a border, plain simplification thins each side
+                                     independently and the simplified edges no longer line up
+                                     (hairline gaps / overlapping alpha). This flag splits each
+                                     ring at junction vertices and simplifies each shared arc
+                                     once. Ignored without --simplify.
               --bbox minX,minY,maxX,maxY   Extent to render (PNG output only).
               --size WIDTH[xHEIGHT]  Image size in pixels (PNG output only).
               --max-dimension <pixels>  PNG only: cap the longer edge at this many pixels and derive
@@ -557,6 +572,7 @@ public static class Runner
               geoconvert roads.shp roads.fgb
               geoconvert coastline.geojson coastline.topojson --simplify 0.01
               geoconvert countries.geojson simplified.geojson --simplify 5 --simplify-method visvalingam
+              geoconvert countries.geojson thinned.fgb --simplify 0.05 --simplify-topology
               geoconvert data.csv data.geojson --from csv
               geoconvert world.geojson europe.png --bbox -10,35,30,60 --size 1200x900
               geoconvert world.geojson world.png --projection web-mercator --size 1200

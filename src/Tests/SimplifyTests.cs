@@ -13,8 +13,8 @@ public class SimplifyTests
         var line = new LineString([new(0, 0), new(1, 0), new(2, 0)]);
         var result = Line(Simplifier.Simplify(line, 0.0001));
         await Assert.That(result.Count).IsEqualTo(2);
-        await Assert.That(result[0]).IsEqualTo(new Position(0, 0));
-        await Assert.That(result[1]).IsEqualTo(new Position(2, 0));
+        await Assert.That(result[0]).IsEqualTo(new(0, 0));
+        await Assert.That(result[1]).IsEqualTo(new(2, 0));
     }
 
     [Test]
@@ -56,8 +56,8 @@ public class SimplifyTests
         ]);
         var result = Line(Simplifier.Simplify(line, 0.1, SimplifyMethod.Visvalingam));
         await Assert.That(result.Count).IsEqualTo(5);
-        await Assert.That(result.Contains(new Position(3, 3))).IsTrue();
-        await Assert.That(result.Contains(new Position(1, 0.001))).IsFalse();
+        await Assert.That(result.Contains(new(3, 3))).IsTrue();
+        await Assert.That(result.Contains(new(1, 0.001))).IsFalse();
     }
 
     [Test]
@@ -90,7 +90,7 @@ public class SimplifyTests
         await Assert.That(ring.Count).IsEqualTo(5);
         // First and last vertex still coincide — the ring stays closed.
         await Assert.That(ring[0]).IsEqualTo(ring[^1]);
-        await Assert.That(ring.Contains(new Position(2, 0.001))).IsFalse();
+        await Assert.That(ring.Contains(new(2, 0.001))).IsFalse();
     }
 
     [Test]
@@ -100,7 +100,14 @@ public class SimplifyTests
         // form — the triangle through the three most extreme vertices — instead of restoring full
         // detail. Restoring the original would invert the contract: a larger tolerance must never
         // produce a larger result (it does for data full of sub-tolerance rings otherwise).
-        var ring = new[] { new Position(0, 0), new(4, 0), new(4, 4), new(0, 4), new(0, 0) };
+        var ring = new[]
+        {
+            new Position(0, 0),
+            new(4, 0),
+            new(4, 4),
+            new(0, 4),
+            new(0, 0)
+        };
         var polygon = new Polygon([ring]);
         var result = (Polygon)Simplifier.Simplify(polygon, 1000);
         var reduced = result.Rings[0];
@@ -109,9 +116,9 @@ public class SimplifyTests
         await Assert.That(reduced[0]).IsEqualTo(reduced[^1]);
         await Assert.That(reduced.All(ring.Contains)).IsTrue();
         // Original traversal order is kept (winding preserved): indices ascend from the anchor.
-        await Assert.That(reduced[0]).IsEqualTo(new Position(0, 0));
-        await Assert.That(reduced[1]).IsEqualTo(new Position(4, 0));
-        await Assert.That(reduced[2]).IsEqualTo(new Position(4, 4));
+        await Assert.That(reduced[0]).IsEqualTo(new(0, 0));
+        await Assert.That(reduced[1]).IsEqualTo(new(4, 0));
+        await Assert.That(reduced[2]).IsEqualTo(new(4, 4));
     }
 
     [Test]
@@ -119,7 +126,14 @@ public class SimplifyTests
     {
         // Every vertex coincides, so there is no triangle to span the extent. The ring can't be made
         // smaller while staying valid, so the (already degenerate) original is kept untouched.
-        var ring = new[] { new Position(2, 2), new(2, 2), new(2, 2), new(2, 2), new(2, 2) };
+        var ring = new[]
+        {
+            new Position(2, 2),
+            new(2, 2),
+            new(2, 2),
+            new(2, 2),
+            new(2, 2)
+        };
         var polygon = new Polygon([ring]);
         var result = (Polygon)Simplifier.Simplify(polygon, 1000);
         await Assert.That(result.Rings[0].Count).IsEqualTo(5);
@@ -131,7 +145,14 @@ public class SimplifyTests
         // All vertices lie on one line: the farthest-from-chord search finds nothing off it, so no
         // triangle has area. The collinear (degenerate) ring is left as-is rather than fabricated into
         // a zero-area triangle.
-        var ring = new[] { new Position(0, 0), new(1, 0), new(2, 0), new(3, 0), new(0, 0) };
+        var ring = new[]
+        {
+            new Position(0, 0),
+            new(1, 0),
+            new(2, 0),
+            new(3, 0),
+            new(0, 0)
+        };
         var polygon = new Polygon([ring]);
         var result = (Polygon)Simplifier.Simplify(polygon, 1000);
         await Assert.That(result.Rings[0].Count).IsEqualTo(5);
@@ -210,11 +231,17 @@ public class SimplifyTests
             },
             Features =
             {
-                new Feature(new LineString([new(0, 0), new(1, 0), new(2, 0)]), new Dictionary<string, object?> { ["name"] = "road" })
+                new(
+                    new LineString(
+                        [new(0, 0), new(1, 0), new(2, 0)]),
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = "road"
+                    })
                 {
                     Id = 7L
                 },
-                new Feature(geometry: null)
+                new(geometry: null)
             }
         };
         var child = new FeatureCollection
@@ -255,12 +282,16 @@ public class SimplifyTests
         // The shared edge runs from (2,0) up to (2,4) with a near-collinear stop at (2, 2.001).
         var collection = new FeatureCollection
         {
-            new Feature(new Polygon([[
-                new(0, 0), new(0, 4), new(2, 4), new(2, 2.001), new(2, 0), new(0, 0),
-            ]])),
-            new Feature(new Polygon([[
-                new(2, 0), new(2, 2.001), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(0, 0), new(0, 4), new(2, 4), new(2, 2.001), new(2, 0), new(0, 0),
+                ]
+            ])),
+            new Feature(new Polygon([
+                [
+                    new(2, 0), new(2, 2.001), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
+                ]
+            ])),
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
@@ -297,12 +328,16 @@ public class SimplifyTests
     {
         var collection = new FeatureCollection
         {
-            new Feature(new Polygon([[
-                new(0, 0), new(0, 4), new(2, 4), new(2.5, 2), new(2, 0), new(0, 0),
-            ]])),
-            new Feature(new Polygon([[
-                new(2, 0), new(2.5, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(0, 0), new(0, 4), new(2, 4), new(2.5, 2), new(2, 0), new(0, 0),
+                ]
+            ])),
+            new Feature(new Polygon([
+                [
+                    new(2, 0), new(2.5, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
+                ]
+            ])),
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.1);
@@ -513,7 +548,10 @@ public class SimplifyTests
             },
             Features =
             {
-                new Feature(new LineString([new(0, 0), new(1, 0.001), new(2, 0)]), new Dictionary<string, object?> { ["name"] = "road" })
+                new Feature(new LineString([new(0, 0), new(1, 0.001), new(2, 0)]), new Dictionary<string, object?>
+                {
+                    ["name"] = "road"
+                })
                 {
                     Id = 7L,
                 },
@@ -594,18 +632,24 @@ public class SimplifyTests
         var collection = new FeatureCollection
         {
             // Triangle 1: anchored on (1,1) with neighbours (0,0) and (2,0).
-            new Feature(new Polygon([[
-                new(0, 0), new(1, 1), new(2, 0), new(0, 0),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(0, 0), new(1, 1), new(2, 0), new(0, 0),
+                ]
+            ])),
             // Triangle 2: anchored on (1,1) with neighbours (2,0) and (2,2).
-            new Feature(new Polygon([[
-                new(2, 0), new(1, 1), new(2, 2), new(2, 0),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(2, 0), new(1, 1), new(2, 2), new(2, 0),
+                ]
+            ])),
             // Triangle 3: anchored on (1,1) with neighbours (2,2) and (0,2) — the third observation
             // hits the already-classified guard.
-            new Feature(new Polygon([[
-                new(2, 2), new(1, 1), new(0, 2), new(2, 2),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(2, 2), new(1, 1), new(0, 2), new(2, 2),
+                ]
+            ])),
         };
 
         var replacements = TopologySimplifier.BuildReplacements(collection, 0.001, SimplifyMethod.DouglasPeucker);
@@ -634,12 +678,16 @@ public class SimplifyTests
         // proves it isn't DP-specific.
         var collection = new FeatureCollection
         {
-            new Feature(new Polygon([[
-                new(0, 0), new(0, 4), new(2, 4), new(2, 2), new(2, 0), new(0, 0),
-            ]])),
-            new Feature(new Polygon([[
-                new(2, 0), new(2, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
-            ]])),
+            new Feature(new Polygon([
+                [
+                    new(0, 0), new(0, 4), new(2, 4), new(2, 2), new(2, 0), new(0, 0),
+                ]
+            ])),
+            new Feature(new Polygon([
+                [
+                    new(2, 0), new(2, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
+                ]
+            ])),
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01, SimplifyMethod.Visvalingam);

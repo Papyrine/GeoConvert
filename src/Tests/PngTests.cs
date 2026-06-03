@@ -1486,15 +1486,21 @@ public class PngTests
         };
         var bounds = new Envelope(-25, -25, 25, 25);
 
-        var filteredPixels = Decode(MapRenderer.RenderPng(features, new RenderOptions
-        {
+        var filteredPixels = Decode(
+            MapRenderer.RenderPng(
+                features,
+                new()
+                {
             Bounds = bounds,
             Width = 1024,
             Height = 1024,
             MinFeaturePixels = 4,
         })).Rgba;
-        var unfilteredPixels = Decode(MapRenderer.RenderPng(features, new RenderOptions
-        {
+        var unfilteredPixels = Decode(
+            MapRenderer.RenderPng(
+                features,
+                new()
+                {
             Bounds = bounds,
             Width = 1024,
             Height = 1024,
@@ -1587,7 +1593,7 @@ public class PngTests
         {
             new Feature(new Polygon([[new(-5, -5), new(5, -5), new(5, 5), new(-5, 5), new(-5, -5)]])),
             new Feature(new LineString([])),
-            new Feature(new Polygon([Array.Empty<Position>()])),
+            new Feature(new Polygon([[]])),
         };
         var options = new RenderOptions
         {

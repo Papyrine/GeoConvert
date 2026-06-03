@@ -386,11 +386,11 @@ public class LabelTests
         // halo does (and that the pad applies even when halo is null).
         var (textWidth, _) = StrokeFont.Measure("A", 14);
 
-        var withoutKnockout = new Labeller(new(200, 32, Rgba.White));
+        var withoutKnockout = new Labeller(new Canvas(200, 32, Rgba.White));
         withoutKnockout.TryPlace("A", 40, 16, 14, Rgba.Black, halo: null);
         var secondWithoutKnockout = withoutKnockout.TryPlace("A", 40 + textWidth + 1, 16, 14, Rgba.Black, halo: null);
 
-        var withKnockout = new Labeller(new(200, 32, Rgba.White));
+        var withKnockout = new Labeller(new Canvas(200, 32, Rgba.White));
         withKnockout.TryPlace("A", 40, 16, 14, Rgba.Black, halo: null, pointOffset: 0, knockout: Rgba.White);
         var secondWithKnockout = withKnockout.TryPlace("A", 40 + textWidth + 1, 16, 14, Rgba.Black, halo: null, pointOffset: 0, knockout: Rgba.White);
 
@@ -411,7 +411,7 @@ public class LabelTests
         withoutHalo.TryPlace("A", 40, 16, 14, Rgba.Black, halo: null);
         var withoutHaloSecond = withoutHalo.TryPlace("A", 40 + textWidth + 1, 16, 14, Rgba.Black, halo: null);
 
-        var withHalo = new Labeller(new(200, 32, Rgba.White));
+        var withHalo = new Labeller(new Canvas(200, 32, Rgba.White));
         withHalo.TryPlace("A", 40, 16, 14, Rgba.Black, halo: Rgba.White);
         var withHaloSecond = withHalo.TryPlace("A", 40 + textWidth + 1, 16, 14, Rgba.Black, halo: Rgba.White);
 

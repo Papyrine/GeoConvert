@@ -1,5 +1,5 @@
 /// <summary>A software RGBA raster with source-over blending and basic line/disc/polygon fills.</summary>
-sealed class Canvas : IDisposable
+sealed class Canvas : IDisposable, IRenderSurface
 {
     // Reused across FillPolygon calls so a render with hundreds of polygons doesn't allocate a fresh
     // crossings list per call.
@@ -294,6 +294,24 @@ sealed class Canvas : IDisposable
             }
         }
     }
+
+    // IRenderSurface: strokes a polyline by drawing each segment as an individual antialiased
+    // thick line. Splitting the chain into segments here (rather than at the call site) is what
+    // lets the vector surface emit one <polyline> per chain while the raster path stays per-segment
+    // — the rendered pixels are identical to looping StrokeLine at the caller.
+    public void StrokePath(IReadOnlyList<(double X, double Y)> points, double width, Rgba color)
+    {
+        for (var i = 0; i + 1 < points.Count; i++)
+        {
+            StrokeLine(points[i].X, points[i].Y, points[i + 1].X, points[i + 1].Y, width, color);
+        }
+    }
+
+    // IRenderSurface: draws label text through the hand-rolled stroke font. The SVG surface emits a
+    // native <text> element instead; both are positioned by the same baseline/anchor math the
+    // Labeller computes, so placement is shared across the two outputs.
+    public void DrawText(string text, double leftX, double baselineY, double size, Rgba color, Rgba? halo) =>
+        StrokeFont.Render(this, text, leftX, baselineY, size, color, halo);
 
     /// <summary>Antialiased disc — every pixel within <c>radius + 0.5</c> gets fractional
     /// coverage based on its distance to the centre. Used directly for point markers, and via

@@ -65,6 +65,9 @@ public static class GeoConverter
             case ".png":
                 format = GeoFormat.Png;
                 return true;
+            case ".svg":
+                format = GeoFormat.Svg;
+                return true;
             default:
                 format = default;
                 return false;
@@ -122,6 +125,8 @@ public static class GeoConverter
                 "Shapefiles span multiple files; read them with a file path, not a stream."),
             GeoFormat.Png => throw new GeoConvertException(
                 "PNG is a write-only raster format and cannot be read into features."),
+            GeoFormat.Svg => throw new GeoConvertException(
+                "SVG is a write-only vector format and cannot be read into features."),
             _ => throw new GeoConvertException($"Unsupported format {format}."),
         };
 
@@ -203,6 +208,17 @@ public static class GeoConverter
                 else
                 {
                     MapRenderer.RenderPng(features, stream, progress);
+                }
+
+                break;
+            case GeoFormat.Svg:
+                if (progress == null)
+                {
+                    MapRenderer.RenderSvg(features, stream);
+                }
+                else
+                {
+                    MapRenderer.RenderSvg(features, stream, progress);
                 }
 
                 break;

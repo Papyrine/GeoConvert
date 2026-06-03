@@ -11,3 +11,4 @@
   csv        .csv
   geoparquet .parquet .geoparquet
   png        .png (write-only; use --bbox and --size)
+  svg        .svg (write-only vector; use --bbox and --size)

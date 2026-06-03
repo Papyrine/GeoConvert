@@ -1,8 +1,8 @@
 # GeoConvert
 
-Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries. Also renders a bounding box to a PNG image.
+Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries. Also renders a bounding box to a PNG raster or an SVG vector image.
 
-Supported formats: GeoJSON, TopoJSON, Shapefile, FlatGeobuf, KML/KMZ, GPX, WKT, WKB, CSV, GeoParquet, and PNG (write-only raster).
+Supported formats: GeoJSON, TopoJSON, Shapefile, FlatGeobuf, KML/KMZ, GPX, WKT, WKB, CSV, GeoParquet, PNG (write-only raster), and SVG (write-only vector).
 
 ```cs
 // Formats are inferred from the file extensions.

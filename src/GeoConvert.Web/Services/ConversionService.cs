@@ -20,9 +20,14 @@ public static class ConversionService
         new(GeoFormat.Csv, "CSV", ".csv", "text/csv", CanRead: true, CanWrite: true),
         new(GeoFormat.GeoParquet, "GeoParquet", ".parquet", "application/octet-stream", CanRead: true, CanWrite: true),
         new(GeoFormat.Png, "PNG image", ".png", "image/png", CanRead: false, CanWrite: true),
+        new(GeoFormat.Svg, "SVG image", ".svg", "image/svg+xml", CanRead: false, CanWrite: true),
     ];
 
-    /// <summary>Formats that can be read from a single uploaded stream (excludes path-only Shapefile and write-only PNG).</summary>
+    /// <summary>The write-only image formats whose download is a render (projection + size apply), not a plain codec write.</summary>
+    public static bool IsRendered(GeoFormat format) =>
+        format is GeoFormat.Png or GeoFormat.Svg;
+
+    /// <summary>Formats that can be read from a single uploaded stream (excludes path-only Shapefile and the write-only images).</summary>
     public static IReadOnlyList<FormatInfo> ReadableFormats { get; } =
         [.. AllFormats.Where(_ => _.CanRead)];
 
@@ -76,7 +81,18 @@ public static class ConversionService
     /// that many pixels (the shorter edge follows the aspect ratio) — otherwise the renderer's default
     /// size applies. <paramref name="progress"/> is reported per feature rasterised.
     /// </summary>
-    public static byte[] RenderPng(FeatureCollection features, MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress = null)
+    public static byte[] RenderPng(FeatureCollection features, MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress = null) =>
+        MapRenderer.RenderPng(features, RenderOptionsFor(projection, maxDimension, progress));
+
+    /// <summary>
+    /// Renders an SVG with the same layout knobs as <see cref="RenderPng"/> — a vector export instead of
+    /// a raster one. Returned as UTF-8 bytes so it flows through the same download path as every other
+    /// writable format.
+    /// </summary>
+    public static byte[] RenderSvg(FeatureCollection features, MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress = null) =>
+        Encoding.UTF8.GetBytes(MapRenderer.RenderSvg(features, RenderOptionsFor(projection, maxDimension, progress)));
+
+    static RenderOptions RenderOptionsFor(MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress)
     {
         var options = new RenderOptions
         {
@@ -105,7 +121,7 @@ public static class ConversionService
             options.MaxDimension = maxDimension;
         }
 
-        return MapRenderer.RenderPng(features, options);
+        return options;
     }
 
     public static byte[] Convert(byte[] input, GeoFormat from, GeoFormat to, IProgress<ConvertProgress>? progress = null) =>

@@ -15,6 +15,7 @@ public class DetectFormatTests
     [Arguments("a.parquet", GeoFormat.GeoParquet)]
     [Arguments("a.geoparquet", GeoFormat.GeoParquet)]
     [Arguments("a.png", GeoFormat.Png)]
+    [Arguments("a.svg", GeoFormat.Svg)]
     [Arguments("DATA.GeoJSON", GeoFormat.GeoJson)]
     public async Task Detect(string path, GeoFormat expected) =>
         await Assert.That(GeoConverter.DetectFormat(path)).IsEqualTo(expected);

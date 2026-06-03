@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 GeoConvert converts maps between geospatial formats (GeoJSON, TopoJSON, Shapefile, FlatGeobuf, KML/KMZ,
-GPX, WKT, WKB, CSV) and renders a bounding box to PNG. It ships as a library plus a `geoconvert` .NET
-tool. **Hard constraint: no third-party dependencies** — only the .NET BCL plus Microsoft-authored
+GPX, WKT, WKB, CSV) and renders a bounding box to PNG (raster) or SVG (vector). It ships as a library
+plus a `geoconvert` .NET tool. **Hard constraint: no third-party dependencies** — only the .NET BCL plus Microsoft-authored
 out-of-band packages (currently `System.IO.Hashing` for CRC32, which dispatches to PCLMULQDQ / PMULL —
 several × faster than the slicing-by-8 table approach for the PNG IDAT chunk). Adding a NuGet
 reference for geo/raster/serialization work is a design violation; the right move is to hand-roll it
@@ -70,8 +70,12 @@ Hub-and-spoke around one in-memory model:
   `GeoConverter` switch sites and `DetectFormat`.
 - **Codecs** (`src/GeoConvert/Formats/`): one static class per format with `Read(Stream)` /
   `Write(Stream, FeatureCollection)` (plus `*String`/`*Bytes` helpers). Exceptions: `Shapefile` is
-  path-based (it spans `.shp`/`.shx`/`.dbf`/`.prj`); `MapRenderer` (in `MapImage.cs`) is write-only PNG
-  via `RenderOptions`.
+  path-based (it spans `.shp`/`.shx`/`.dbf`/`.prj`); `MapRenderer` (in `Render/MapRenderer.cs`) is
+  write-only and renders via `RenderOptions` to either PNG (`RenderPng`, raster) or SVG (`RenderSvg`,
+  vector). Both share one pass written against `IRenderSurface` (`Canvas` for PNG, `SvgSurface` for
+  SVG), so projection, per-layer styling, stroke autoscaling and label placement are identical across
+  the two; only the primitive sink and final encode differ. SVG labels are native `<text>` (glyph
+  shapes are viewer-dependent, but placement/collision matches PNG, which sizes from the stroke font).
 - **Simplification** (`Simplifier.cs`): two entry points for lossy vertex reduction. `Simplify` thins
   each ring/line independently (Douglas–Peucker or Visvalingam — see `LineSimplifier` for the
   algorithms); `SimplifyTopology` does a junction-detection pass across the entire collection first,

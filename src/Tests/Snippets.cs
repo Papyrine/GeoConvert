@@ -170,6 +170,34 @@ static class Snippets
         #endregion
     }
 
+    public static void RenderToSvg()
+    {
+        #region RenderToSvg
+
+        var features = GeoConverter.Read("countries.geojson");
+
+        // SVG is a vector export: same RenderOptions as PNG (bounds, size, projection, colours,
+        // labels), but geometry becomes <path>/<polyline>/<circle> and labels become native
+        // <text>, so the output scales crisply at any zoom. RenderSvg returns the markup as a
+        // string; the path/stream overloads write it out directly.
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-10, 35, 30, 60),
+            Width = 1200,
+            Height = 900,
+        };
+
+        var markup = MapRenderer.RenderSvg(features, options);
+        File.WriteAllText("europe.svg", markup);
+
+        // Or write straight to a file / stream.
+        MapRenderer.RenderSvg(features, "europe.svg", options);
+
+        #endregion
+
+        Console.WriteLine(markup.Length);
+    }
+
     public static void RenderLayers()
     {
         #region RenderLayers

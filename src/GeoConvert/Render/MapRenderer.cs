@@ -1,9 +1,11 @@
 namespace GeoConvert;
 
 /// <summary>
-/// Renders a <see cref="FeatureCollection"/> to a PNG raster, clipped to a bounding box. This is a
-/// write-only export (a PNG cannot be read back into features). Built on a small software rasterizer and
-/// a hand-rolled PNG encoder, with no third-party dependencies.
+/// Renders a <see cref="FeatureCollection"/> to a PNG raster (<see cref="RenderPng(FeatureCollection, RenderOptions)"/>)
+/// or an SVG vector document (<see cref="RenderSvg(FeatureCollection, RenderOptions)"/>), clipped to a
+/// bounding box. Both are write-only exports (neither can be read back into features) and share the same
+/// projection, styling, stroke autoscaling and label-placement pipeline — PNG via a small software
+/// rasterizer and a hand-rolled PNG encoder, SVG via emitted markup. No third-party dependencies.
 /// </summary>
 public static class MapRenderer
 {
@@ -76,6 +78,65 @@ public static class MapRenderer
         Render(layers, stream, options, bounds, progress);
     }
 
+    /// <summary>
+    /// Renders a <see cref="FeatureCollection"/> to an SVG document (returned as markup), clipped to a
+    /// bounding box. Like <see cref="RenderPng(FeatureCollection, RenderOptions)"/> this is a write-only
+    /// export — an SVG cannot be read back into features — and it honours the same
+    /// <see cref="RenderOptions"/> (bounds, size, projection, colours, stroke autoscaling, per-layer
+    /// styles and labels), the difference being a vector output: geometry becomes SVG path/polyline/circle
+    /// elements and labels become native <c>&lt;text&gt;</c>, so the result scales without rasterising.
+    /// <see cref="RenderOptions.Compression"/> is ignored (it is PNG-only).
+    /// </summary>
+    public static string RenderSvg(FeatureCollection features, RenderOptions? options = null) =>
+        RenderSvg([features], options);
+
+    public static void RenderSvg(FeatureCollection features, string path, RenderOptions? options = null) =>
+        RenderSvg([features], path, options);
+
+    public static void RenderSvg(FeatureCollection features, Stream stream, RenderOptions? options = null) =>
+        RenderSvg([features], stream, options);
+
+    /// <summary>
+    /// Renders multiple <see cref="FeatureCollection"/>s as stacked top-level layers to SVG markup — the
+    /// vector counterpart of <see cref="RenderPng(IReadOnlyList{FeatureCollection}, RenderOptions)"/>,
+    /// with the same stacking, per-layer styling and union-bounds behaviour.
+    /// </summary>
+    public static string RenderSvg(IReadOnlyList<FeatureCollection> layers, RenderOptions? options = null)
+    {
+        options ??= new();
+        var bounds = Validate(layers, options);
+        using var memory = new MemoryStream();
+        RenderSvgWithProgress(layers, memory, options, bounds);
+        return Encoding.UTF8.GetString(memory.ToArray());
+    }
+
+    public static void RenderSvg(IReadOnlyList<FeatureCollection> layers, string path, RenderOptions? options = null)
+    {
+        options ??= new();
+        // Validate before File.Create so a throw leaves the destination untouched (see the PNG path
+        // overload for the rationale).
+        var bounds = Validate(layers, options);
+        using var stream = File.Create(path);
+        RenderSvgWithProgress(layers, stream, options, bounds);
+    }
+
+    public static void RenderSvg(IReadOnlyList<FeatureCollection> layers, Stream stream, RenderOptions? options = null)
+    {
+        options ??= new();
+        var bounds = Validate(layers, options);
+        RenderSvgWithProgress(layers, stream, options, bounds);
+    }
+
+    // SVG counterpart of the internal PNG entry point: used by GeoConverter when an SVG conversion is
+    // given a progress sink (the facade has already built the reporter and wrapped the stream).
+    internal static void RenderSvg(FeatureCollection features, Stream stream, ProgressReporter progress)
+    {
+        var layers = new[] { features };
+        var options = new RenderOptions();
+        var bounds = Validate(layers, options);
+        RenderSvgTo(layers, stream, options, bounds, progress);
+    }
+
     // Honours RenderOptions.Progress for the public entry points: builds a Writing-phase reporter whose
     // FeatureTotal is the whole layer set, wraps the stream so the encoded PNG bytes are tallied too,
     // then renders. With no sink set it renders straight through with no per-feature bookkeeping.
@@ -90,6 +151,28 @@ public static class MapRenderer
         {
             Render(layers, stream, options, bounds, null);
         }
+    }
+
+    // SVG analogue of RenderWithProgress.
+    static void RenderSvgWithProgress(IReadOnlyList<FeatureCollection> layers, Stream stream, RenderOptions options, Envelope bounds)
+    {
+        if (options.Progress is { } sink)
+        {
+            var reporter = new ProgressReporter(sink, ProgressPhase.Writing, TotalFeatures(layers), null);
+            RenderSvgTo(layers, new ProgressStream(stream, reporter), options, bounds, reporter);
+        }
+        else
+        {
+            RenderSvgTo(layers, stream, options, bounds, null);
+        }
+    }
+
+    static void RenderSvgTo(IReadOnlyList<FeatureCollection> layers, Stream stream, RenderOptions options, Envelope bounds, ProgressReporter? progress)
+    {
+        var projection = new Projection(bounds, options);
+        var surface = new SvgSurface(projection.Width, projection.Height, options.Background);
+        Paint(surface, projection, layers, options, bounds, progress);
+        surface.WriteTo(stream);
     }
 
     static long TotalFeatures(IReadOnlyList<FeatureCollection> layers)
@@ -109,7 +192,7 @@ public static class MapRenderer
         if (bounds.IsEmpty)
         {
             throw new GeoConvertException(
-                "Cannot render PNG: the features is empty. Provide RenderOptions.Bounds.");
+                "Cannot render: the features is empty. Provide RenderOptions.Bounds.");
         }
 
         if (options is {MaxDimension: <= 0, Width: <= 0})
@@ -135,13 +218,22 @@ public static class MapRenderer
     {
         var projection = new Projection(bounds, options);
         using var canvas = new Canvas(projection.Width, projection.Height, options.Background);
+        Paint(canvas, projection, layers, options, bounds, progress);
+        Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, options.Compression);
+    }
 
+    // Renders the scene into the given surface (raster or vector) — every pass below is written
+    // against IRenderSurface so PNG and SVG share the projection, styling, stroke autoscaling and
+    // label placement, differing only in how each entry point builds the surface and finalises the
+    // output.
+    static void Paint(IRenderSurface surface, Projection projection, IReadOnlyList<FeatureCollection> layers, RenderOptions options, Envelope bounds, ProgressReporter? progress)
+    {
         // StrokeAutoScale: derive a multiplier from the implicit zoom (canvas/bbox ratio) so the
         // same scene rendered at a tighter bbox or bigger canvas gets proportionally thicker
         // strokes, matching what tile-map stylesheets do across zoom levels. When the flag is
         // off, the multiplier is 1.0 — the threading is the same in both cases so there's no
         // branch on every feature.
-        var strokeMultiplier = options.StrokeAutoScale ? ComputeStrokeMultiplier(canvas, bounds) : 1.0;
+        var strokeMultiplier = options.StrokeAutoScale ? ComputeStrokeMultiplier(surface.Width, surface.Height, bounds) : 1.0;
 
         if (options.Ocean is { } ocean)
         {
@@ -150,7 +242,7 @@ public static class MapRenderer
             // canvas background — that's what makes the projection's lobed shape pop visually.
             foreach (var ring in projection.GetWorldEnvelopeRings())
             {
-                canvas.FillPolygon([ring], ocean);
+                surface.FillPolygon([ring], ocean);
             }
 
             // Outline each lobe with the regular stroke colour so the envelope reads as a clear
@@ -159,42 +251,37 @@ public static class MapRenderer
             // top/bottom edges would double up into a thick horizontal line bisecting the map).
             foreach (var chain in projection.GetWorldEnvelopeStrokes())
             {
-                for (var i = 0; i + 1 < chain.Length; i++)
-                {
-                    canvas.StrokeLine(chain[i].X, chain[i].Y, chain[i + 1].X, chain[i + 1].Y, options.StrokeWidth * strokeMultiplier, options.Stroke);
-                }
+                surface.StrokePath(chain, options.StrokeWidth * strokeMultiplier, options.Stroke);
             }
         }
 
         foreach (var layer in layers)
         {
-            DrawLayer(canvas, layer, projection, options, strokeMultiplier, progress);
+            DrawLayer(surface, layer, projection, options, strokeMultiplier, progress);
         }
 
         // Labels run after every geometry pass so they sit on top of all fills and strokes —
         // burying a label under a later layer's fill would defeat the point. A single Labeller is
         // shared across every layer so collisions are global: a child layer's label can't overlap a
         // parent layer's label, even though their geometry passes paint independently.
-        var labeller = new Labeller(canvas);
+        var labeller = new Labeller(surface);
         foreach (var layer in layers)
         {
             DrawLabels(layer, projection, options, labeller, strokeMultiplier);
         }
-
-        Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, options.Compression);
     }
 
     // Pre-order: a layer paints its own features first, then recurses into its children. Source-over
     // blending means whatever paints last sits on top, so children naturally appear over their parent
     // — pick layer styles via RenderOptions.LayerStyle to keep them visually distinct.
-    static void DrawLayer(Canvas canvas, FeatureCollection layer, Projection projection, RenderOptions options, double strokeMultiplier, ProgressReporter? progress)
+    static void DrawLayer(IRenderSurface surface, FeatureCollection layer, Projection projection, RenderOptions options, double strokeMultiplier, ProgressReporter? progress)
     {
         var style = Resolve(options.LayerStyle?.Invoke(layer), options, strokeMultiplier);
         foreach (var feature in layer.Features)
         {
             if (feature.Geometry is { } geometry)
             {
-                Draw(canvas, geometry, projection, style);
+                Draw(surface, geometry, projection, style);
             }
 
             // One report per feature visited (geometry or not) so the running count reaches the
@@ -204,7 +291,7 @@ public static class MapRenderer
 
         foreach (var child in layer.Children)
         {
-            DrawLayer(canvas, child, projection, options, strokeMultiplier, progress);
+            DrawLayer(surface, child, projection, options, strokeMultiplier, progress);
         }
     }
 
@@ -258,61 +345,61 @@ public static class MapRenderer
     /// [<see cref="strokeMultiplierMin"/>, <see cref="strokeMultiplierMax"/>] so a degenerate bbox
     /// doesn't blow the multiplier to infinity or zero.
     /// </summary>
-    static double ComputeStrokeMultiplier(Canvas canvas, Envelope bounds)
+    static double ComputeStrokeMultiplier(int width, int height, Envelope bounds)
     {
-        var pixelsPerDegree = Math.Min(canvas.Width / bounds.Width, canvas.Height / bounds.Height);
+        var pixelsPerDegree = Math.Min(width / bounds.Width, height / bounds.Height);
         var zoom = Math.Log2(pixelsPerDegree * 360.0 / 256);
         var multiplier = Math.Pow(strokeZoomBase, zoom - strokeZoomAnchor);
         return Math.Clamp(multiplier, strokeMultiplierMin, strokeMultiplierMax);
     }
 
-    static void Draw(Canvas canvas, Geometry geometry, Projection projection, ResolvedStyle style)
+    static void Draw(IRenderSurface surface, Geometry geometry, Projection projection, ResolvedStyle style)
     {
         switch (geometry)
         {
             case Point point:
                 var (px, py) = projection.ToPixel(point.Coordinate);
-                canvas.FillDisc(px, py, style.PointRadius, style.Stroke);
+                surface.FillDisc(px, py, style.PointRadius, style.Stroke);
                 break;
             case MultiPoint multiPoint:
                 foreach (var position in multiPoint.Positions)
                 {
                     var (x, y) = projection.ToPixel(position);
-                    canvas.FillDisc(x, y, style.PointRadius, style.Stroke);
+                    surface.FillDisc(x, y, style.PointRadius, style.Stroke);
                 }
 
                 break;
             case LineString line:
-                StrokePath(canvas, line.Positions, projection, style);
+                StrokePath(surface, line.Positions, projection, style);
                 break;
             case MultiLineString multiLine:
                 foreach (var child in multiLine.LineStrings)
                 {
-                    StrokePath(canvas, child.Positions, projection, style);
+                    StrokePath(surface, child.Positions, projection, style);
                 }
 
                 break;
             case Polygon polygon:
-                DrawPolygon(canvas, polygon, projection, style);
+                DrawPolygon(surface, polygon, projection, style);
                 break;
             case MultiPolygon multiPolygon:
                 foreach (var child in multiPolygon.Polygons)
                 {
-                    DrawPolygon(canvas, child, projection, style);
+                    DrawPolygon(surface, child, projection, style);
                 }
 
                 break;
             case GeometryCollection collection:
                 foreach (var child in collection.Geometries)
                 {
-                    Draw(canvas, child, projection, style);
+                    Draw(surface, child, projection, style);
                 }
 
                 break;
         }
     }
 
-    static void DrawPolygon(Canvas canvas, Polygon polygon, Projection projection, ResolvedStyle style)
+    static void DrawPolygon(IRenderSurface surface, Polygon polygon, Projection projection, ResolvedStyle style)
     {
         // MinFeaturePixels: render-time cartographic selection. Drop this whole polygon — including
         // its holes — if its outer ring's projected pixel bbox is below the threshold in both axes,
@@ -335,15 +422,15 @@ public static class MapRenderer
         // dark vertical stroke down each lobe meridian, reading as a thin slice through the shape.
         foreach (var batch in projection.PreparePolygon(polygon.Rings))
         {
-            canvas.FillPolygon(batch.Fill, style.Fill);
+            surface.FillPolygon(batch.Fill, style.Fill);
             foreach (var chain in batch.Strokes)
             {
-                StrokeRing(canvas, chain, style);
+                StrokeRing(surface, chain, style);
             }
         }
     }
 
-    static void StrokePath(Canvas canvas, IReadOnlyList<Position> positions, Projection projection, ResolvedStyle style)
+    static void StrokePath(IRenderSurface surface, IReadOnlyList<Position> positions, Projection projection, ResolvedStyle style)
     {
         // MinFeaturePixels filter, mirroring DrawPolygon. Applied per LineString — the Draw switch
         // routes each MultiLineString member through here independently — so a major river's huge
@@ -360,10 +447,7 @@ public static class MapRenderer
         // never straddle the interrupt gap.
         foreach (var subpath in projection.PrepareLine(positions))
         {
-            for (var i = 0; i + 1 < subpath.Length; i++)
-            {
-                canvas.StrokeLine(subpath[i].X, subpath[i].Y, subpath[i + 1].X, subpath[i + 1].Y, style.StrokeWidth, style.Stroke);
-            }
+            surface.StrokePath(subpath, style.StrokeWidth, style.Stroke);
         }
     }
 
@@ -413,13 +497,8 @@ public static class MapRenderer
         return Math.Max(pxMax - pxMin, pyMax - pyMin) < minPixels;
     }
 
-    static void StrokeRing(Canvas canvas, (double X, double Y)[] ring, ResolvedStyle style)
-    {
-        for (var i = 0; i + 1 < ring.Length; i++)
-        {
-            canvas.StrokeLine(ring[i].X, ring[i].Y, ring[i + 1].X, ring[i + 1].Y, style.StrokeWidth, style.Stroke);
-        }
-    }
+    static void StrokeRing(IRenderSurface surface, (double X, double Y)[] ring, ResolvedStyle style) =>
+        surface.StrokePath(ring, style.StrokeWidth, style.Stroke);
 
     // Pre-order walk matching DrawLayer's order: a parent's labels are placed before its children's,
     // so on collision the higher-up-the-tree label wins. That mirrors the typical cartographic

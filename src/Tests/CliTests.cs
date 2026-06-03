@@ -103,6 +103,25 @@ public class CliTests
     }
 
     [Test]
+    public async Task RendersSvgWithBoundingBox()
+    {
+        using var directory = new TempDirectory();
+
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.svg");
+
+        var code = Runner.Run(
+            [input, output, "--bbox", "-1,-1,16,16", "--size", "128x128", "--label", "name"],
+            new StringWriter(),
+            new StringWriter());
+
+        await Assert.That(code).IsEqualTo(0);
+        await Assert.That(File.Exists(output)).IsTrue();
+        await Assert.That((await File.ReadAllTextAsync(output)).StartsWith("<?xml", StringComparison.Ordinal)).IsTrue();
+    }
+
+    [Test]
     public async Task NoArgumentsReturnsUsage() =>
         await Assert.That(Runner.Run([], new StringWriter(), new StringWriter())).IsEqualTo(2);
 

@@ -108,7 +108,7 @@
             </button>
         </div>
 
-        @* Clicking Download runs the actual conversion (write, or render for PNG) on a background
+        @* Clicking Download runs the actual conversion (write, or render for PNG/SVG) on a background
            thread; show its live progress right under the button. !isRendering excludes the preview
            render, which has its own bar above. *@
         @if (isBusy && !isRendering)

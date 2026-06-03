@@ -17,4 +17,7 @@ public enum GeoFormat
 
     /// <summary>A rendered raster image. Write-only — see <see cref="MapRenderer"/>.</summary>
     Png,
+
+    /// <summary>A rendered vector image. Write-only — see <see cref="MapRenderer"/>.</summary>
+    Svg,
 }

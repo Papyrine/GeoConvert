@@ -264,15 +264,18 @@ public partial class Index
             return;
         }
 
-        BeginPhase(info.Format == GeoFormat.Png
+        BeginPhase(ConversionService.IsRendered(info.Format)
             ? "Rendering image…"
             : $"Writing {info.DisplayName}…");
         try
         {
             var format = info.Format;
-            var bytes = await Task.Run(() => format == GeoFormat.Png
-                ? ConversionService.RenderPng(collection, projection, maxDimension, progress)
-                : ConversionService.Write(collection, format, progress));
+            var bytes = await Task.Run(() => format switch
+            {
+                GeoFormat.Png => ConversionService.RenderPng(collection, projection, maxDimension, progress),
+                GeoFormat.Svg => ConversionService.RenderSvg(collection, projection, maxDimension, progress),
+                _ => ConversionService.Write(collection, format, progress),
+            });
             var baseName = Path.GetFileNameWithoutExtension(sourceName) ?? "map";
             await FileDownloadService.DownloadAsync($"{baseName}{info.Extension}", info.ContentType, bytes);
         }

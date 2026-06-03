@@ -1,5 +1,5 @@
 /// <summary>
-/// Greedy label placer for the PNG renderer. Each <see cref="TryPlace"/> call either centres a label
+/// Greedy label placer shared by the PNG and SVG renderers. Each <see cref="TryPlace"/> call either centres a label
 /// on the anchor (for polygon centroids and line midpoints, which are the *interior* of the feature
 /// and the label belongs *on* them) or walks an Imhof-style candidate ring around the anchor (for
 /// point features, where the anchor is the point itself and the label belongs *beside* the dot,
@@ -14,15 +14,15 @@
 /// </summary>
 sealed class Labeller
 {
-    readonly Canvas canvas;
+    readonly IRenderSurface surface;
 
     // Axis-aligned bounding boxes (inclusive low, exclusive high) of every placed label. A linear
-    // scan is fine for the feature counts a single PNG can readably display (a few hundred labels
+    // scan is fine for the feature counts a single map can readably display (a few hundred labels
     // max before the map becomes a smudge); a spatial index would only matter past that.
     readonly List<(double X0, double Y0, double X1, double Y1)> placed = [];
 
-    public Labeller(Canvas canvas) =>
-        this.canvas = canvas;
+    public Labeller(IRenderSurface surface) =>
+        this.surface = surface;
 
     /// <summary>Number of labels successfully placed so far. Exposed for tests.</summary>
     public int PlacedCount => placed.Count;
@@ -135,7 +135,7 @@ sealed class Labeller
         // Off-canvas rejection. Any part of the (haloed) bbox sitting outside [0, W) × [0, H)
         // means part of the label would clip — drop it entirely rather than render a cropped word
         // that reads wrong.
-        if (bx0 < 0 || by0 < 0 || bx1 > canvas.Width || by1 > canvas.Height)
+        if (bx0 < 0 || by0 < 0 || bx1 > surface.Width || by1 > surface.Height)
         {
             return false;
         }
@@ -154,10 +154,10 @@ sealed class Labeller
             // Paint the backdrop before halo + text so both render over (and source-over blend
             // with) the knockout colour rather than the underlying geometry. A semi-transparent
             // knockout reads as a dimming wash; a fully-opaque one fully erases the geometry.
-            canvas.FillRect(bx0, by0, bx1, by1, knockoutColor);
+            surface.FillRect(bx0, by0, bx1, by1, knockoutColor);
         }
 
-        StrokeFont.Render(canvas, text, leftX, baselineY, size, color, halo);
+        surface.DrawText(text, leftX, baselineY, size, color, halo);
         placed.Add((bx0, by0, bx1, by1));
         return true;
     }

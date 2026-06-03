@@ -4,14 +4,14 @@
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert)](https://www.nuget.org/packages/GeoConvert/)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.Cli.svg?label=GeoConvert.Cli)](https://www.nuget.org/packages/GeoConvert.Cli/)
 
-Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries (`System.Text.Json`, `System.Xml`, `System.IO.Compression`). It can also render a bounding box to a PNG image. Ships as a library and a `geoconvert` command line tool.
+Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries (`System.Text.Json`, `System.Xml`, `System.IO.Compression`). It can also render a bounding box to a PNG raster or an SVG vector image. Ships as a library and a `geoconvert` command line tool.
 
 **[Try it in the browser →](https://papyrine.github.io/GeoConvert/)** — a Blazor WebAssembly app that converts maps entirely client-side (no data leaves the local device).
 
 
 ## Supported formats
 
-All vector formats can be both read and written; PNG is a write-only raster export.
+All vector formats can be both read and written; PNG and SVG are write-only image exports.
 
 | Format | Extension(s) | Kind |
 | --- | --- | --- |
@@ -27,6 +27,7 @@ All vector formats can be both read and written; PNG is a write-only raster expo
 | [CSV](https://datatracker.ietf.org/doc/html/rfc4180) | `.csv` | Text (WKT or lon/lat columns) |
 | [GeoParquet](https://geoparquet.org/) | `.parquet`, `.geoparquet` | Binary (Apache Parquet) |
 | [PNG](https://www.w3.org/TR/png-3/) | `.png` | Raster image (write-only) |
+| [SVG](https://www.w3.org/TR/SVG2/) | `.svg` | Vector image (write-only) |
 
 All coordinates are treated as [WGS84 (EPSG:4326)](https://epsg.io/4326) longitude/latitude.
 
@@ -186,6 +187,42 @@ geoconvert world.geojson europe.png --bbox -10,35,30,60 --size 1200x900
 ```
 
 
+## Vector export (SVG)
+
+The same scene can be rendered to SVG instead — a vector export that scales crisply at any zoom. It shares the whole PNG pipeline (projection, per-layer styling, stroke autoscaling, label placement and collision); only the output differs: geometry becomes `<path>`/`<polyline>`/`<circle>` and labels become native `<text>`. `RenderSvg` returns the markup as a string, and there are path/stream overloads that write it out directly:
+
+<!-- snippet: RenderToSvg -->
+<a id='snippet-RenderToSvg'></a>
+```cs
+var features = GeoConverter.Read("countries.geojson");
+
+// SVG is a vector export: same RenderOptions as PNG (bounds, size, projection, colours,
+// labels), but geometry becomes <path>/<polyline>/<circle> and labels become native
+// <text>, so the output scales crisply at any zoom. RenderSvg returns the markup as a
+// string; the path/stream overloads write it out directly.
+var options = new RenderOptions
+{
+    Bounds = new Envelope(-10, 35, 30, 60),
+    Width = 1200,
+    Height = 900,
+};
+
+var markup = MapRenderer.RenderSvg(features, options);
+File.WriteAllText("europe.svg", markup);
+
+// Or write straight to a file / stream.
+MapRenderer.RenderSvg(features, "europe.svg", options);
+```
+<sup><a href='/src/Tests/Snippets.cs#L175-L196' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToSvg' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
+
+The same `RenderOptions` knobs apply (`RenderOptions.Compression` is the one exception — it is PNG-only). Because labels are emitted as native `<text>`, their glyph shapes depend on the fonts available to the viewer; placement and collision are identical to the PNG renderer (which reserves boxes from the hand-rolled stroke font's metrics). From the command line, output a `.svg` and pass `--bbox`/`--size` exactly as for PNG:
+
+```
+geoconvert world.geojson europe.svg --bbox -10,35,30,60 --size 1200x900
+```
+
+
 ### Projection
 
 When `RenderOptions.Projection` is left at its default `MapProjection.Auto`, the renderer picks one from the data bounds: a regional extent (latitude span < 60°, longitude span < 90°) renders as Lambert Conformal Conic, a continental extent renders as plate carrée, and a world extent (longitude span ≥ 180° or latitude span ≥ 90°) renders as Goode's Homolosine — equal-area, so high-latitude landmasses read at honest size. Auto never picks Web Mercator — that's a deliberate layout choice (tile-style), not a distortion-minimisation one, so it stays explicit.
@@ -218,7 +255,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L419-L434' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L447-L462' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -244,7 +281,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L439-L453' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L467-L481' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -273,7 +310,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L458-L477' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L486-L505' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -332,7 +369,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(basemap, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L175-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L203-L247' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 When the layers come from independent sources (typically a basemap file plus an overlay file), pass the collections as a list — they render in order, first under, last on top. Each `FeatureCollection` is a top-level layer for `RenderOptions.LayerStyle`, and the rendered extent defaults to the union of every input's bounds:
@@ -370,7 +407,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L224-L256' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L252-L284' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -416,7 +453,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L324-L350' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L352-L378' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -453,7 +490,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L355-L382' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L383-L410' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -519,7 +556,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/src/Tests/Snippets.cs#L261-L319' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L289-L347' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -561,7 +598,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/src/Tests/Snippets.cs#L389-L414' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L417-L442' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

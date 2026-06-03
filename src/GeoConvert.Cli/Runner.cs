@@ -24,6 +24,7 @@ public static class Runner
         ["geoparquet"] = GeoFormat.GeoParquet,
         ["parquet"] = GeoFormat.GeoParquet,
         ["png"] = GeoFormat.Png,
+        ["svg"] = GeoFormat.Svg,
     };
 
     public static int Run(string[] args, TextWriter output, TextWriter error)
@@ -302,7 +303,7 @@ public static class Runner
                     : Simplifier.Simplify(features, simplifyValue, simplifyMethod);
             }
 
-            if (toFormat == GeoFormat.Png)
+            if (toFormat is GeoFormat.Png or GeoFormat.Svg)
             {
                 var renderOptions = new RenderOptions
                 {
@@ -351,7 +352,14 @@ public static class Runner
                     renderOptions.LabelKnockout = labelKnockout;
                 }
 
-                MapRenderer.RenderPng(features, outputPath, renderOptions);
+                if (toFormat == GeoFormat.Png)
+                {
+                    MapRenderer.RenderPng(features, outputPath, renderOptions);
+                }
+                else
+                {
+                    MapRenderer.RenderSvg(features, outputPath, renderOptions);
+                }
             }
             else
             {
@@ -538,17 +546,17 @@ public static class Runner
                                      (hairline gaps / overlapping alpha). This flag splits each
                                      ring at junction vertices and simplifies each shared arc
                                      once. Ignored without --simplify.
-              --bbox minX,minY,maxX,maxY   Extent to render (PNG output only).
-              --size WIDTH[xHEIGHT]  Image size in pixels (PNG output only).
-              --max-dimension <pixels>  PNG only: cap the longer edge at this many pixels and derive
+              --bbox minX,minY,maxX,maxY   Extent to render (PNG/SVG output only).
+              --size WIDTH[xHEIGHT]  Image size in pixels (PNG/SVG output only).
+              --max-dimension <pixels>  PNG/SVG only: cap the longer edge at this many pixels and derive
                                      the shorter from the aspect ratio (fit within an N×N box).
                                      Overrides --size when set.
-              --projection <name>    Projection for PNG output: 'auto' (default — picks
+              --projection <name>    Projection for PNG/SVG output: 'auto' (default — picks
                                      lambert for regional bounds, plate-carree for continental,
                                      goode for world), 'plate-carree', 'web-mercator', 'lambert'
                                      (Lambert Conformal Conic, low distortion at country/state
                                      scale), or 'goode' (Goode's Homolosine, equal-area world map).
-              --label <property>     PNG only: render each feature's property value as a text label
+              --label <property>     PNG/SVG only: render each feature's property value as a text label
                                      (single-stroke vector font; printable ASCII plus Latin
                                      diacritics, ligatures like ß/æ/ø render as '?'). Polygon/line
                                      labels centre on the centroid / midpoint; point labels walk an
@@ -580,6 +588,7 @@ public static class Runner
               geoconvert states.geojson states.png --projection lambert --size 1600
               geoconvert world.geojson world.png --projection goode --size 1600
               geoconvert cities.geojson cities.png --label name --label-size 18
+              geoconvert world.geojson world.svg --bbox -10,35,30,60 --size 1200x900
             """);
 
     static void PrintFormats(TextWriter writer) =>
@@ -598,5 +607,6 @@ public static class Runner
               csv        .csv
               geoparquet .parquet .geoparquet
               png        .png (write-only; use --bbox and --size)
+              svg        .svg (write-only vector; use --bbox and --size)
             """);
 }

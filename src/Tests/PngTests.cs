@@ -1573,4 +1573,32 @@ public class PngTests
         await Assert.That(overrideOnly).IsGreaterThan(0).Because("root layer survived because root MinFeaturePixels is 0");
         await Assert.That(overrideOnly).IsLessThan(noneFiltered).Because("child layer was filtered by its LayerStyle override");
     }
+
+    [Test]
+    public async Task MinFeaturePixels_handles_empty_geometry_without_crashing()
+    {
+        // Defensive guard inside IsBelowMinPixels: an empty positions sequence returns false (don't
+        // filter) rather than indexing positions[0] and throwing. Real-world geo data rarely carries
+        // an empty LineString or empty-ring Polygon, but the GeoConvert model allows them, and a
+        // single malformed feature shouldn't crash the whole render. This test feeds one of each
+        // alongside a normal polygon (which sets the bounds and survives) and asserts that with
+        // MinFeaturePixels > 0 the render still produces a valid PNG with the survivor painted.
+        var features = new FeatureCollection
+        {
+            new Feature(new Polygon([[new(-5, -5), new(5, -5), new(5, 5), new(-5, 5), new(-5, -5)]])),
+            new Feature(new LineString([])),
+            new Feature(new Polygon([Array.Empty<Position>()])),
+        };
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-10, -10, 10, 10),
+            Width = 256,
+            Height = 256,
+            MinFeaturePixels = 4,
+        };
+
+        var (_, _, pixels) = Decode(MapRenderer.RenderPng(features, options));
+        await Assert.That(NonBackgroundCount(pixels)).IsGreaterThan(0)
+            .Because("the normal polygon survived; the empty geometries didn't crash the render");
+    }
 }

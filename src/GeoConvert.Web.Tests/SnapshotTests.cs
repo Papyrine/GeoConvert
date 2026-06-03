@@ -128,7 +128,10 @@ public class SnapshotTests
             Buffer = Sample.GeoJsonBytes
         });
 
-        var image = await page.WaitForSelectorAsync(".preview img", new() { Timeout = 30000 });
+        var image = await page.WaitForSelectorAsync(".preview img", new()
+        {
+            Timeout = 30000
+        });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -146,7 +149,10 @@ public class SnapshotTests
 
         await page.ClickAsync(".sample-btn");
 
-        var image = await page.WaitForSelectorAsync(".preview img", new() { Timeout = 60000 });
+        var image = await page.WaitForSelectorAsync(".preview img", new()
+        {
+            Timeout = 60000
+        });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -165,18 +171,22 @@ public class SnapshotTests
 
         var cdp = await page.Context.NewCDPSessionAsync(page);
         await cdp.SendAsync("Network.enable");
-        await cdp.SendAsync("Network.emulateNetworkConditions", new Dictionary<string, object>
-        {
-            ["offline"] = false,
-            ["latency"] = 0,
-            ["downloadThroughput"] = 4 * 1024 * 1024,
-            ["uploadThroughput"] = 4 * 1024 * 1024,
-        });
+        await cdp.SendAsync("Network.emulateNetworkConditions",
+            new()
+            {
+                ["offline"] = false,
+                ["latency"] = 0,
+                ["downloadThroughput"] = 4 * 1024 * 1024,
+                ["uploadThroughput"] = 4 * 1024 * 1024,
+            });
 
         await page.ClickAsync(".sample-btn");
 
         // The determinate fill (not the indeterminate variant) appears while bytes stream in.
-        await page.WaitForSelectorAsync(".progress-fill:not(.progress-fill-indeterminate)", new() { Timeout = 20000 });
+        await page.WaitForSelectorAsync(".progress-fill:not(.progress-fill-indeterminate)", new()
+        {
+            Timeout = 20000
+        });
 
         // Its label names the download phase and carries a byte-ratio detail (e.g. "1.2 / 19.4 MB").
         var label = await page.TextContentAsync(".progress-label");
@@ -184,7 +194,10 @@ public class SnapshotTests
         await Assert.That(label).Contains("MB");
 
         // And the load still completes to a rendered preview afterwards.
-        await page.WaitForSelectorAsync(".preview img", new() { Timeout = 60000 });
+        await page.WaitForSelectorAsync(".preview img", new()
+        {
+            Timeout = 60000
+        });
     }
 
     // The Download button runs the actual write/render conversion (off the UI thread) and then hands the
@@ -202,12 +215,18 @@ public class SnapshotTests
             MimeType = "application/geo+json",
             Buffer = Sample.GeoJsonBytes
         });
-        await page.WaitForSelectorAsync(".preview img", new() { Timeout = 30000 });
+        await page.WaitForSelectorAsync(".preview img", new()
+        {
+            Timeout = 30000
+        });
 
         // Default target format is KML; clicking Download converts then saves.
         var download = await page.RunAndWaitForDownloadAsync(
             () => page.ClickAsync(".convert-btn"),
-            new() { Timeout = 30000 });
+            new()
+            {
+                Timeout = 30000
+            });
 
         await Assert.That(download.SuggestedFilename).EndsWith(".kml");
     }
@@ -284,6 +303,6 @@ public class SnapshotTests
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
-        return ((IPEndPoint) listener.LocalEndpoint).Port;
+        return ((IPEndPoint)listener.LocalEndpoint).Port;
     }
 }

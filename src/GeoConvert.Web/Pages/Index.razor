@@ -242,10 +242,12 @@
         }
     }
 
-    // Loads the world map bundled as a static web asset at /sample/world.fgb (built from MapBundle.World
-    // and simplified at build time). The multi-MB download is streamed with a determinate progress bar
-    // (its size is known up front), then the read/render reuse the same off-thread pipeline as an uploaded
-    // file, so progress and preview behave identically once the bytes are in memory.
+    // Loads the world map bundled as a static web asset at /sample/World/borders.fgb (built from
+    // MapBundle.World by MapBundle's own simplify pipeline; see GeoConvert.Web.csproj). The
+    // <Region>/<layer>.fgb path layout is MapBundle's convention under MapBundleOutputDirectory,
+    // not a Blazor routing decision. The multi-MB download is streamed with a determinate progress
+    // bar (its size is known up front), then the read/render reuse the same off-thread pipeline as
+    // an uploaded file, so progress and preview behave identically once the bytes are in memory.
     async Task LoadSampleWorldMap()
     {
         Reset();
@@ -256,7 +258,7 @@
         {
             isDownloading = true;
             BeginPhase("Downloading sample world map…");
-            var bytes = await DownloadSampleAsync("sample/world.fgb");
+            var bytes = await DownloadSampleAsync("sample/World/borders.fgb");
             isDownloading = false;
 
             BeginPhase("Reading map…");

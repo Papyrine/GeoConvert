@@ -24,64 +24,29 @@
 
   <!--
     Bundle a sample world map as a static web asset, built at compile time from MapBundle.World.
-    MapBundle ships the world layers as full-detail FlatGeobuf (borders alone is ~63 MB). MapBundle's
-    own simplify (topology-preserving since MapBundle 0.3.0) would do exactly what we want
-    geometrically, but it stages its output at maps/<Region>/<layer>.fgb in the build output, not
-    under wwwroot — and Blazor WebAssembly's dev server records ContentRoot as wwwroot and serves
-    empty bytes for a linked file outside it. So we skip MapBundle's staging entirely
-    (MapBundleCopyData=false) and run `geoconvert simplify-topology` against the raw FlatGeobuf,
-    writing straight into wwwroot/sample/world.fgb where the dev server can serve it directly. The
-    result is downloaded on demand when the user clicks "View sample world map", never at app
-    startup. FlatGeobuf is kept (binary, far smaller than GeoJSON) and ConversionService already
-    reads it. MapBundleLayers limits the @(MapBundleData) item set to just the borders layer so the
-    simplify Exec runs once on one file rather than per-layer-batched on all eight.
+    MapBundle ships the world layers as full-detail FlatGeobuf (borders alone is ~63 MB); the four
+    MSBuild properties below drive its built-in pipeline to filter, simplify and stage the result:
+
+      MapBundleLayers=Borders                    — drop every other layer (cities, rivers, …)
+      MapBundleSimplifyTolerance=0.1             — Simplifier.SimplifyTopology in MapBundle 0.3.0+,
+                                                    so adjacent country borders stay seamlessly
+                                                    joined after thinning (no hairline gaps).
+      MapBundleOutputDirectory=…\wwwroot\sample  — write the result straight into the source
+                                                    wwwroot, where Blazor's default static-web-asset
+                                                    glob picks it up automatically. The file lands
+                                                    at wwwroot/sample/World/borders.fgb (the
+                                                    <Region>/<filename>.<ext> layout MapBundle uses
+                                                    under the output directory), served at
+                                                    /sample/World/borders.fgb.
+
+    No custom Target, no Exec, no Copy — MapBundle does the work, the consumer just points it.
+    The result is downloaded on demand when the user clicks "View sample world map", never at app
+    startup. FlatGeobuf is kept (binary, far smaller than GeoJSON) and ConversionService reads it.
   -->
   <PropertyGroup>
-    <WorldSampleTolerance>0.1</WorldSampleTolerance>
-    <MapBundleCopyData>false</MapBundleCopyData>
     <MapBundleLayers>Borders</MapBundleLayers>
+    <MapBundleSimplifyTolerance>0.1</MapBundleSimplifyTolerance>
+    <MapBundleOutputDirectory>$(MSBuildProjectDirectory)\wwwroot\sample</MapBundleOutputDirectory>
   </PropertyGroup>
-
-  <!-- The default Content glob also matches the generated file (it's staged under wwwroot below); drop it
-       here so the target is the single source of that Content item, avoiding NETSDK1022 duplicate-item
-       errors on incremental builds where the file already exists at evaluation. -->
-  <ItemGroup>
-    <Content Remove="wwwroot\sample\world.fgb" />
-  </ItemGroup>
-
-  <!--
-    Topology-aware simplification of the raw borders.fgb into wwwroot. Inputs= the raw 63 MB file
-    from the MapBundle package; Outputs= the simplified ~7 MB asset. MSBuild's up-to-date check on
-    Inputs/Outputs means a no-op when the source and tolerance haven't changed. The Exec runs
-    GeoConvert.Cli via `dotnet run` (the project is a sibling, so this is in-repo) — adds a few
-    seconds the first time, instant once the CLI is built. Stage under wwwroot before
-    ResolveProjectStaticWebAssets so DefineStaticWebAssets picks it up and serves it as
-    /sample/world.fgb; the file MUST be physically under wwwroot (a linked file is copied on
-    publish but the dev server records ContentRoot as wwwroot and serves empty bytes).
-
-    DependsOnTargets="_MapBundleProcess": pins this target to run AFTER MapBundle's filter target
-    (which is what MapBundleLayers="Borders" above is consumed by). Without it the BeforeTargets
-    of the two targets both point at AssignTargetPaths and the order isn't guaranteed — if this
-    one ran first, @(MapBundleData) would still carry all eight layers and the Exec would
-    metadata-batch across them, running once per layer and overwriting world.fgb on each pass.
-  -->
-  <Target Name="_SimplifyWorldSampleMap"
-          DependsOnTargets="_MapBundleProcess"
-          BeforeTargets="ResolveProjectStaticWebAssets;AssignTargetPaths"
-          Inputs="@(MapBundleData);$(MSBuildProjectFullPath)"
-          Outputs="$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb">
-    <MakeDir Directories="$(MSBuildProjectDirectory)\wwwroot\sample" />
-    <!-- Batch the Exec only over the .fgb layer file. MapBundleLayers filters @(MapBundleData) to
-         layer files the consumer wants, but it deliberately preserves the meta.json sidecar (which
-         the MapBundle runtime would otherwise miss); we don't load via MapBundle's Maps.Open here,
-         so the sidecar is irrelevant — the Condition skips its batch instead of running the
-         geoconvert CLI on a JSON file and overwriting the just-produced world.fgb with an error. -->
-    <Exec Command="dotnet run --project &quot;$(MSBuildThisFileDirectory)..\GeoConvert.Cli\GeoConvert.Cli.csproj&quot; -f net11.0 -c $(Configuration) -- &quot;%(MapBundleData.FullPath)&quot; &quot;$(MSBuildProjectDirectory)\wwwroot\sample\world.fgb&quot; --simplify $(WorldSampleTolerance) --simplify-topology"
-          Condition="'%(MapBundleData.Extension)' == '.fgb'"
-          WorkingDirectory="$(MSBuildProjectDirectory)" />
-    <ItemGroup>
-      <Content Include="wwwroot\sample\world.fgb" />
-    </ItemGroup>
-  </Target>
 
 </Project>

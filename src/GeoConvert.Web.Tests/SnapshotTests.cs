@@ -302,7 +302,15 @@ public class SnapshotTests
     static async Task SettleAsync(IPage page)
     {
         await page.WaitForSelectorAsync(".file-drop");
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
+        // NetworkIdle is brittle here: the multithreaded WASM runtime keeps fetching pthread workers
+        // after first paint, so the network never goes quiet on the default 30s budget during a cold
+        // first boot (the heaviest, run-first test pays the full asset download). Give it generous
+        // headroom so a slow runner doesn't time out before the runtime settles — it does settle once
+        // the workers are warmed, as every later test in this class confirms.
+        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new()
+        {
+            Timeout = 120000
+        });
         // The theme toggle's label is driven by MainLayout.OnInitializedAsync (an async preference
         // load), so until that completes it shows the default-theme label and only then flips to match
         // the active theme. The slower multithreaded boot widens that window, so wait for the label to

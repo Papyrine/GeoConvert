@@ -17,7 +17,7 @@
     <!-- Test-only: cross-validates the hand-rolled GeoParquet codec against an independent reader/writer. -->
     <PackageVersion Include="Parquet.Net" Version="6.0.3" />
     <!-- GeoConvert.Web (Blazor WASM): build-time world-map data bundled via MapBundle. -->
-    <PackageVersion Include="MapBundle.World" Version="0.2.1" />
+    <PackageVersion Include="MapBundle.World" Version="0.3.0" />
     <!-- GeoConvert.Web (Blazor WASM) + GeoConvert.Web.Tests (TUnit / bunit / Playwright). -->
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
     <PackageVersion Include="bunit" Version="2.7.2" />

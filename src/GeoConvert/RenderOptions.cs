@@ -92,6 +92,33 @@ public sealed class RenderOptions
     public bool StrokeAutoScale { get; set; } = true;
 
     /// <summary>
+    /// Per-feature minimum pixel size, in the rendered canvas's pixel space. When positive, a
+    /// polygon or line whose projected axis-aligned bounding box is smaller than this many pixels
+    /// in <em>both</em> width and height is skipped — the renderer paints neither its fill nor its
+    /// stroke. Defaults to <c>0</c> (off): every feature renders, no matter how small. Set to
+    /// <c>1</c> for a "if it can't be seen, don't paint it" floor that visually cleans up dense
+    /// archipelagoes (thousands of sub-pixel islands rendering as 1-px black specks) and other
+    /// areas where many tiny isolated features would otherwise read as noise rather than detail.
+    /// Higher values prune more aggressively — a thumbnail rendering with
+    /// <see cref="MinFeaturePixels"/> = 4 drops anything you couldn't usefully click on anyway.
+    /// <para>
+    /// This is the cartographic "selection / elimination" generalization operation applied at
+    /// render time: it adapts what gets drawn to the target canvas's scale without mutating the
+    /// underlying data — zooming in (a tighter <see cref="Bounds"/> or larger <see cref="Width"/>)
+    /// naturally surfaces features that were filtered at a wider view. The check works on
+    /// individual sub-polygons of a <see cref="MultiPolygon"/> and individual <see cref="LineString"/>s
+    /// of a <see cref="MultiLineString"/>, so a country with a huge mainland and many small islands
+    /// renders its mainland (clearly above threshold) while dropping the sub-pixel islands.
+    /// </para>
+    /// <para>
+    /// Points and multi-points are never filtered — a point is one pixel by definition; if the
+    /// caller wants them dropped too they can omit them from the input. Geometry collections
+    /// recurse into their members, each filtered independently.
+    /// </para>
+    /// </summary>
+    public double MinFeaturePixels { get; set; }
+
+    /// <summary>
     /// Per-layer style override. Invoked once for each <see cref="FeatureCollection"/> visited during
     /// rendering (the root plus every nested layer in <see cref="FeatureCollection.Children"/>). Return
     /// null — or leave this property null — to use the default colors above; return a

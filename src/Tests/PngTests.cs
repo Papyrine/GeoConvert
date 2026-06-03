@@ -1396,4 +1396,181 @@ public class PngTests
 
         return (width, height, PngDecoder.Reconstruct(raw.ToArray(), width, height));
     }
+
+    // -------------------------- MinFeaturePixels --------------------------
+    //
+    // Render-time cartographic "selection / elimination": skip features whose projected pixel bbox
+    // falls below MinFeaturePixels. Each scenario below is constructed so the feature being tested
+    // either clearly does or clearly doesn't project to a bbox above the threshold, no off-by-one
+    // sensitivity to rasterizer pixel-coverage behaviour.
+
+    [Test]
+    public async Task MinFeaturePixels_default_off_renders_a_tiny_polygon()
+    {
+        // The smoke-test guard: with MinFeaturePixels at its default 0, a feature that paints into
+        // a single pixel still paints. If a future refactor accidentally treats 0 as "drop
+        // everything below 0" with a sign flip or off-by-one, this test catches it.
+        var features = new FeatureCollection
+        {
+            // 0.001° × 0.001° square at the centre of a 50° × 50° canvas → ~0.02 px per side.
+            new Feature(new Polygon([[new(0, 0), new(0.001, 0), new(0.001, 0.001), new(0, 0.001), new(0, 0)]])),
+        };
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-25, -25, 25, 25),
+            Width = 1024,
+            Height = 1024,
+        };
+
+        var (_, _, pixels) = Decode(MapRenderer.RenderPng(features, options));
+        await Assert.That(NonBackgroundCount(pixels)).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task MinFeaturePixels_drops_a_sub_threshold_polygon()
+    {
+        // Same 0.001° × 0.001° square as above, same canvas. With MinFeaturePixels = 4, the
+        // projected ~0.02 px bbox is well below threshold and the polygon is filtered. The canvas
+        // ends up all-background.
+        var features = new FeatureCollection
+        {
+            new Feature(new Polygon([[new(0, 0), new(0.001, 0), new(0.001, 0.001), new(0, 0.001), new(0, 0)]])),
+        };
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-25, -25, 25, 25),
+            Width = 1024,
+            Height = 1024,
+            MinFeaturePixels = 4,
+        };
+
+        var (_, _, pixels) = Decode(MapRenderer.RenderPng(features, options));
+        await Assert.That(NonBackgroundCount(pixels)).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task MinFeaturePixels_keeps_a_polygon_above_threshold()
+    {
+        // 10° × 10° square at 1024-px PlateCarree of a 50° wide bounds projects to ~205 × 205 px
+        // bbox — comfortably above any reasonable threshold. With MinFeaturePixels = 4 it still
+        // renders. This is the "big mainland survives" half of the archipelago use case.
+        var features = new FeatureCollection
+        {
+            new Feature(new Polygon([[new(-5, -5), new(5, -5), new(5, 5), new(-5, 5), new(-5, -5)]])),
+        };
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-25, -25, 25, 25),
+            Width = 1024,
+            Height = 1024,
+            MinFeaturePixels = 4,
+        };
+
+        var (_, _, pixels) = Decode(MapRenderer.RenderPng(features, options));
+        await Assert.That(NonBackgroundCount(pixels)).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task MinFeaturePixels_filters_each_subpolygon_of_a_multipolygon_independently()
+    {
+        // The archipelago use case in miniature: one MultiPolygon Feature carrying a big "mainland"
+        // polygon (~205 px bbox) and a sub-pixel "island" polygon (~0.02 px bbox). The filter must
+        // apply per Polygon, not per Feature — drop the island, keep the mainland. We confirm both
+        // halves: rendered pixels > 0 (mainland), AND fewer rendered pixels than the same scene
+        // with the island also drawn (filter actually removed the island).
+        var mainland = new Polygon([[new(-5, -5), new(5, -5), new(5, 5), new(-5, 5), new(-5, -5)]]);
+        var island = new Polygon([[new(15, 15), new(15.001, 15), new(15.001, 15.001), new(15, 15.001), new(15, 15)]]);
+        var features = new FeatureCollection
+        {
+            new Feature(new MultiPolygon([mainland, island])),
+        };
+        var bounds = new Envelope(-25, -25, 25, 25);
+
+        var filteredPixels = Decode(MapRenderer.RenderPng(features, new RenderOptions
+        {
+            Bounds = bounds,
+            Width = 1024,
+            Height = 1024,
+            MinFeaturePixels = 4,
+        })).Rgba;
+        var unfilteredPixels = Decode(MapRenderer.RenderPng(features, new RenderOptions
+        {
+            Bounds = bounds,
+            Width = 1024,
+            Height = 1024,
+        })).Rgba;
+
+        var filteredCount = NonBackgroundCount(filteredPixels);
+        var unfilteredCount = NonBackgroundCount(unfilteredPixels);
+        // Mainland still rendered.
+        await Assert.That(filteredCount).IsGreaterThan(0);
+        // Island removed → strictly fewer painted pixels than without the filter.
+        await Assert.That(filteredCount).IsLessThan(unfilteredCount);
+    }
+
+    [Test]
+    public async Task MinFeaturePixels_filters_lines_too()
+    {
+        // A tiny LineString (0.001° long → ~0.02 px) gets dropped. A big LineString in the same
+        // scene (50° long → ~1024 px) doesn't. Confirms StrokePath honours the same threshold
+        // DrawPolygon does — without it, multi-line layers like rivers would still spam noise.
+        var bounds = new Envelope(-25, -25, 25, 25);
+        var options = new RenderOptions
+        {
+            Bounds = bounds,
+            Width = 1024,
+            Height = 1024,
+            MinFeaturePixels = 4,
+        };
+
+        var tiny = new FeatureCollection { new Feature(new LineString([new(0, 0), new(0.001, 0.001)])) };
+        var big = new FeatureCollection { new Feature(new LineString([new(-20, -20), new(20, 20)])) };
+
+        await Assert.That(NonBackgroundCount(Decode(MapRenderer.RenderPng(tiny, options)).Rgba)).IsEqualTo(0);
+        await Assert.That(NonBackgroundCount(Decode(MapRenderer.RenderPng(big, options)).Rgba)).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task MinFeaturePixels_per_layer_override()
+    {
+        // Root options leave the filter off (0 = no filter). A LayerStyle on the child sets
+        // MinFeaturePixels = 4. The child's tiny polygon should be filtered, the root's same-shape
+        // tiny polygon should render. Proves the override path in Resolve() works — a partial
+        // LayerStyle (no Stroke/Fill changes, just MinFeaturePixels) inherits the rest unchanged.
+        // Two tiny polygons at DIFFERENT canvas positions so they paint distinct pixels — otherwise
+        // overrideOnly and noneFiltered tie on pixel count (the dropped child landed on the same
+        // pixels the root already painted) and the assertion below becomes vacuous.
+        var rootTiny = new Polygon([[new(-15, -15), new(-14.999, -15), new(-14.999, -14.999), new(-15, -14.999), new(-15, -15)]]);
+        var childTiny = new Polygon([[new(15, 15), new(15.001, 15), new(15.001, 15.001), new(15, 15.001), new(15, 15)]]);
+        var child = new FeatureCollection { new Feature(childTiny) };
+        child.Name = "child";
+        var root = new FeatureCollection { new Feature(rootTiny) };
+        root.Children.Add(child);
+        var options = new RenderOptions
+        {
+            Bounds = new Envelope(-25, -25, 25, 25),
+            Width = 1024,
+            Height = 1024,
+            LayerStyle = layer => layer.Name == "child" ? new LayerStyle { MinFeaturePixels = 4 } : null,
+        };
+
+        // Hard to assert "child filtered AND root not" by pixel count alone (both polygons paint
+        // into the same ~1 px region of the canvas). Instead: compare against a baseline that has
+        // BOTH layers filtered and a baseline that has NEITHER. The override-only run sits strictly
+        // between them — more painted pixels than fully-filtered (root survived), fewer than
+        // fully-unfiltered (child dropped).
+        var overrideOnly = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, options)).Rgba);
+        var bothFiltered = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, new RenderOptions
+        {
+            Bounds = options.Bounds, Width = 1024, Height = 1024, MinFeaturePixels = 4,
+        })).Rgba);
+        var noneFiltered = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, new RenderOptions
+        {
+            Bounds = options.Bounds, Width = 1024, Height = 1024,
+        })).Rgba);
+
+        await Assert.That(bothFiltered).IsEqualTo(0).Because("both filters on → canvas all-background");
+        await Assert.That(overrideOnly).IsGreaterThan(0).Because("root layer survived because root MinFeaturePixels is 0");
+        await Assert.That(overrideOnly).IsLessThan(noneFiltered).Because("child layer was filtered by its LayerStyle override");
+    }
 }

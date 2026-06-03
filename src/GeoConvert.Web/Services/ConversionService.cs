@@ -82,6 +82,16 @@ public static class ConversionService
         {
             Projection = projection,
             StrokeAutoScale = true,
+            // Render-time cartographic selection: drop polygons / lines whose projected bbox is
+            // below 1 px in both axes. Without this, world-scale renders of detailed admin datasets
+            // (the sample world map's thousands of Indonesian / Norwegian / Arctic-Archipelago
+            // islands) paint every sub-pixel feature as a 1-px stroke speck, turning dense coasts
+            // into visual noise instead of recognisable land. At 1 the threshold matches the
+            // "if you can't paint it cleanly, don't paint it at all" floor; raising it (2 or 4)
+            // prunes more aggressively for thumbnails. Zooming in (a tighter Bounds or larger
+            // canvas) naturally surfaces the pruned features again — the filter is render-scale
+            // adaptive, not destructive.
+            MinFeaturePixels = 1,
             Progress = progress
         };
         if (maxDimension > 0)

@@ -110,6 +110,46 @@ public class ConversionServiceTests
     }
 
     [Test]
+    public async Task RenderPng_FiltersSubPixelFeatures()
+    {
+        // Pins that ConversionService.RenderPng applies RenderOptions.MinFeaturePixels = 1 — the
+        // render-time selection threshold that makes the sample world map's dense archipelagoes
+        // (Indonesia, Norway, Arctic Canada) render cleanly instead of as a black-speck noise field.
+        // Removing the setting in a future refactor would make this test fail.
+        //
+        // Differential check, not an absolute byte-size threshold: render the same scene twice —
+        // once through ConversionService (filter on at 1 px), once through MapRenderer directly
+        // with otherwise-equivalent options (filter off, the renderer's default). The ConversionService
+        // output must be strictly smaller, because the only difference between the two PNGs is the
+        // tiny polygon's painted mark — present in the no-filter render, absent in the filtered one.
+        // Two features so the data bounds are set by the big one (50° wide), making the tiny one
+        // actually project to sub-pixel size — with the tiny polygon alone the data bounds would
+        // shrink to ~0.001° and the polygon would fill the whole canvas in both renders.
+        var subPixel = new FeatureCollection
+        {
+            // Big rectangle: defines the bounds, dominates the painted area.
+            new Feature(new Polygon([[new(0, 0), new(50, 0), new(50, 50), new(0, 50), new(0, 0)]])),
+            // Tiny rectangle at the opposite corner: ~0.001° vs ~50° of canvas = sub-pixel at any
+            // sensible canvas size, well below MinFeaturePixels = 1.
+            new Feature(new Polygon([[new(-25, -25), new(-24.999, -25), new(-24.999, -24.999), new(-25, -24.999), new(-25, -25)]])),
+        };
+
+        var filtered = ConversionService.RenderPng(subPixel, MapProjection.PlateCarree, 256);
+        var unfiltered = MapRenderer.RenderPng(subPixel, new RenderOptions
+        {
+            Projection = MapProjection.PlateCarree,
+            MaxDimension = 256,
+            StrokeAutoScale = true,
+            // MinFeaturePixels intentionally left at its default 0 — this is the "filter off"
+            // baseline the wrapper's output must beat.
+        });
+
+        await Assert.That(filtered.Length).IsLessThan(unfiltered.Length)
+            .Because($"filtered={filtered.Length} bytes, unfiltered={unfiltered.Length} bytes; "
+                + "the only difference is the sub-pixel polygon's paint, so MinFeaturePixels=1 must drop it.");
+    }
+
+    [Test]
     public async Task Convert_RoundTripsThroughFlatGeobuf()
     {
         var fgb = ConversionService.Convert(Sample.GeoJsonBytes, GeoFormat.GeoJson, GeoFormat.FlatGeobuf);

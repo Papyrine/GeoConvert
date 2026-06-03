@@ -82,6 +82,12 @@ public static class ConversionService
         {
             Projection = projection,
             StrokeAutoScale = true,
+            // Paint the projection's world envelope as ocean under every feature. For Goode this is
+            // what makes the lobed shape — the curving lobe-boundary meridians and the equator/pole
+            // arcs — visible; without it Goode renders as floating continents in a void with none of
+            // the projection's defining outlines. For the rectangular projections the envelope is
+            // the whole canvas, so this just doubles as a sea-colour background for the world map.
+            Ocean = new(200, 220, 240),
             // Render-time cartographic selection: drop polygons / lines whose projected bbox is
             // below 1 px in both axes. Without this, world-scale renders of detailed admin datasets
             // (the sample world map's thousands of Indonesian / Norwegian / Arctic-Archipelago

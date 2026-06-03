@@ -121,18 +121,29 @@ public class ConversionServiceTests
         // once through ConversionService (filter on at 1 px), once through MapRenderer directly
         // with otherwise-equivalent options (filter off, the renderer's default). The ConversionService
         // output must be strictly smaller, because the only difference between the two PNGs is the
-        // tiny polygon's painted mark — present in the no-filter render, absent in the filtered one.
-        // Two features so the data bounds are set by the big one (50° wide), making the tiny one
-        // actually project to sub-pixel size — with the tiny polygon alone the data bounds would
-        // shrink to ~0.001° and the polygon would fill the whole canvas in both renders.
+        // tiny polygons' painted marks — present in the no-filter render, absent in the filtered one.
+        // One anchor polygon sets the bounds (~50° wide) so the rest project to sub-pixel size, and
+        // a scattered grid of tiny polygons gives the unfiltered render a constellation of specks
+        // whose deflate cost reliably exceeds the filtered render's uniform background — a single
+        // speck alone gets swamped by the ocean fill and the byte counts come out tied.
         var subPixel = new FeatureCollection
         {
             // Big rectangle: defines the bounds, dominates the painted area.
             new Feature(new Polygon([[new(0, 0), new(50, 0), new(50, 50), new(0, 50), new(0, 0)]])),
-            // Tiny rectangle at the opposite corner: ~0.001° vs ~50° of canvas = sub-pixel at any
-            // sensible canvas size, well below MinFeaturePixels = 1.
-            new Feature(new Polygon([[new(-25, -25), new(-24.999, -25), new(-24.999, -24.999), new(-25, -24.999), new(-25, -25)]])),
         };
+        // Each tiny rectangle is ~0.001° vs ~50° of canvas = sub-pixel at 256 px, well below
+        // MinFeaturePixels = 1. Scattered across a 6×6 grid in the negative quadrant so the
+        // anchor still owns the bounds.
+        for (var i = 0; i < 6; i++)
+        {
+            for (var j = 0; j < 6; j++)
+            {
+                var x = -45 + i * 7;
+                var y = -45 + j * 7;
+                subPixel.Add(new Feature(new Polygon(
+                    [[new(x, y), new(x + 0.001, y), new(x + 0.001, y + 0.001), new(x, y + 0.001), new(x, y)]])));
+            }
+        }
 
         var filtered = ConversionService.RenderPng(subPixel, MapProjection.PlateCarree, 256);
         var unfiltered = MapRenderer.RenderPng(subPixel, new RenderOptions
@@ -140,6 +151,11 @@ public class ConversionServiceTests
             Projection = MapProjection.PlateCarree,
             MaxDimension = 256,
             StrokeAutoScale = true,
+            // Mirror every non-filter knob the wrapper sets, so the only difference between the two
+            // renders stays MinFeaturePixels. Ocean in particular must match — paints the whole
+            // canvas blue for rectangular projections, so an asymmetric setting would swamp the
+            // byte saving from dropping the sub-pixel polygon and the differential check would lie.
+            Ocean = new(200, 220, 240),
             // MinFeaturePixels intentionally left at its default 0 — this is the "filter off"
             // baseline the wrapper's output must beat.
         });

@@ -201,7 +201,7 @@ public class ConversionServiceTests
     {
         var features = ConversionService.Read(Sample.GeoJsonBytes, GeoFormat.GeoJson);
         var recorder = new Recorder();
-        ConversionService.RenderPng(features, MapProjection.Auto, 256, recorder);
+        ConversionService.RenderPng(features, MapProjection.Auto, 256, true, recorder);
 
         await Assert.That(recorder.Reports[^1].FeatureTotal).IsEqualTo(2L);
     }

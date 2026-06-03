@@ -81,18 +81,42 @@ public static class ConversionService
     /// that many pixels (the shorter edge follows the aspect ratio) — otherwise the renderer's default
     /// size applies. <paramref name="progress"/> is reported per feature rasterised.
     /// </summary>
-    public static byte[] RenderPng(FeatureCollection features, MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress = null) =>
-        MapRenderer.RenderPng(features, RenderOptionsFor(projection, maxDimension, progress));
+    public static byte[] RenderPng(FeatureCollection features, MapProjection projection, int maxDimension, bool labels = false, IProgress<ConvertProgress>? progress = null) =>
+        MapRenderer.RenderPng(features, RenderOptionsFor(projection, maxDimension, labels, progress));
 
     /// <summary>
     /// Renders an SVG with the same layout knobs as <see cref="RenderPng"/> — a vector export instead of
     /// a raster one. Returned as UTF-8 bytes so it flows through the same download path as every other
     /// writable format.
     /// </summary>
-    public static byte[] RenderSvg(FeatureCollection features, MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress = null) =>
-        Encoding.UTF8.GetBytes(MapRenderer.RenderSvg(features, RenderOptionsFor(projection, maxDimension, progress)));
+    public static byte[] RenderSvg(FeatureCollection features, MapProjection projection, int maxDimension, bool labels = false, IProgress<ConvertProgress>? progress = null) =>
+        Encoding.UTF8.GetBytes(MapRenderer.RenderSvg(features, RenderOptionsFor(projection, maxDimension, labels, progress)));
 
-    static RenderOptions RenderOptionsFor(MapProjection projection, int maxDimension, IProgress<ConvertProgress>? progress)
+    // Common name-like property keys, tried in order, so the label toggle "just works" without the user
+    // having to name a property. The web app has no per-property picker (the CLI's --label does), so this
+    // covers the conventional keys carried by the formats it reads — Natural Earth / GeoJSON "name" and
+    // its cased/localised variants — and falls back to the feature Id.
+    static readonly string[] labelKeys =
+        ["name", "NAME", "Name", "name_en", "NAME_EN", "admin", "ADMIN", "title", "label", "id"];
+
+    static string? LabelFor(Feature feature)
+    {
+        foreach (var key in labelKeys)
+        {
+            if (feature.Properties.TryGetValue(key, out var value) && value is not null)
+            {
+                var text = value.ToString();
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    return text;
+                }
+            }
+        }
+
+        return feature.Id?.ToString();
+    }
+
+    static RenderOptions RenderOptionsFor(MapProjection projection, int maxDimension, bool labels, IProgress<ConvertProgress>? progress)
     {
         var options = new RenderOptions
         {
@@ -119,6 +143,11 @@ public static class ConversionService
         if (maxDimension > 0)
         {
             options.MaxDimension = maxDimension;
+        }
+
+        if (labels)
+        {
+            options.Label = LabelFor;
         }
 
         return options;

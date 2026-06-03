@@ -33,6 +33,7 @@ public partial class Index
     GeoFormat target = GeoFormat.Kml;
     MapProjection projection = MapProjection.Auto;
     int maxDimension = 2048;
+    bool showLabels;
     bool isBusy;
     bool isRendering;
     ConvertProgress? progressReport;
@@ -219,7 +220,7 @@ public partial class Index
     {
         try
         {
-            var png = ConversionService.RenderPng(collection, projection, maxDimension, progress);
+            var png = ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress);
             return $"data:image/png;base64,{Convert.ToBase64String(png)}";
         }
         catch
@@ -251,6 +252,12 @@ public partial class Index
         return RefreshPreviewAsync();
     }
 
+    Task OnShowLabelsChanged(ChangeEventArgs args)
+    {
+        showLabels = args.Value is true;
+        return RefreshPreviewAsync();
+    }
+
     async Task Download()
     {
         if (features is not { } collection || sourceFormat is null)
@@ -272,8 +279,8 @@ public partial class Index
             var format = info.Format;
             var bytes = await Task.Run(() => format switch
             {
-                GeoFormat.Png => ConversionService.RenderPng(collection, projection, maxDimension, progress),
-                GeoFormat.Svg => ConversionService.RenderSvg(collection, projection, maxDimension, progress),
+                GeoFormat.Png => ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress),
+                GeoFormat.Svg => ConversionService.RenderSvg(collection, projection, maxDimension, showLabels, progress),
                 _ => ConversionService.Write(collection, format, progress),
             });
             var baseName = Path.GetFileNameWithoutExtension(sourceName) ?? "map";

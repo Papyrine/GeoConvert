@@ -44,6 +44,22 @@
     </ItemGroup>
   </Target>
 
+  <!-- MapBundle's convert task only re-runs when the source DATA changes, not when its embedded GeoConvert
+       does — so upgrading MapBundle (e.g. to pick up a simplifier fix that yields a smaller map from the
+       same data) otherwise leaves the previously staged output untouched. The task assembly's path carries
+       the package version; when it differs from the last run, wipe the intermediate so the convert below
+       regenerates. A clean build with the same version still skips, keeping the incremental loop fast. -->
+  <Target Name="_InvalidateStaleSampleMap" BeforeTargets="_MapBundleConvert">
+    <PropertyGroup>
+      <_MapBundleStamp>$(MapBundleIntermediateDir)tasks.stamp</_MapBundleStamp>
+      <_MapBundleStampValue Condition="Exists('$(_MapBundleStamp)')">$([System.IO.File]::ReadAllText('$(_MapBundleStamp)').Trim())</_MapBundleStampValue>
+    </PropertyGroup>
+    <RemoveDir Condition="'$(_MapBundleStampValue)' != '$(_MapBundleTasksAssembly)'"
+               Directories="$(MapBundleIntermediateDir)" />
+    <MakeDir Directories="$(MapBundleIntermediateDir)" />
+    <WriteLinesToFile File="$(_MapBundleStamp)" Lines="$(_MapBundleTasksAssembly)" Overwrite="true" />
+  </Target>
+
   <!-- The default Content glob also matches the generated file (it's staged under wwwroot below); drop it
        here so the target is the single source of that Content item, avoiding NETSDK1022 duplicate-item
        errors on incremental builds where the file already exists at evaluation. -->

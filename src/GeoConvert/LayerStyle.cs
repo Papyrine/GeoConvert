@@ -20,6 +20,12 @@ public sealed class LayerStyle
     /// <summary>Point marker radius in pixels for features in this layer. Null inherits <see cref="RenderOptions.PointRadius"/>.</summary>
     public int? PointRadius { get; set; }
 
+    /// <summary>Per-feature minimum pixel size for this layer. Null inherits
+    /// <see cref="RenderOptions.MinFeaturePixels"/>. See that property for the semantics — typical
+    /// use is to set it on a coastline / borders layer where small islands at world scale read as
+    /// noise, while leaving cities or labels layers at the default <c>0</c>.</summary>
+    public double? MinFeaturePixels { get; set; }
+
     /// <summary>
     /// Resolves the label text for a feature in this layer (e.g. <c>feature =>
     /// feature.Properties["name"] as string</c>). Return null — or leave this property null — to

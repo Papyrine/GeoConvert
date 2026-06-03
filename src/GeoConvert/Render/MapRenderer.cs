@@ -208,16 +208,20 @@ public static class MapRenderer
         }
     }
 
-    // Collapses the user-facing LayerStyle (any subset of overrides) into the four concrete values the
+    // Collapses the user-facing LayerStyle (any subset of overrides) into the concrete values the
     // rasterizer needs, falling back to RenderOptions defaults for each null property independently.
     // StrokeWidth scales by the full zoom-derived strokeMultiplier; PointRadius scales by the gentler
     // PointMultiplier (see remarks there). Both are 1.0 unless StrokeAutoScale is on.
+    // MinFeaturePixels is NOT multiplied by anything — it's a flat pixel threshold the rasterizer
+    // tests against projected bbox sizes directly, so a value of 1 means "1 pixel" regardless of
+    // zoom (and 0 means "no filter", the default).
     static ResolvedStyle Resolve(LayerStyle? overrides, RenderOptions options, double strokeMultiplier) =>
         new(
             overrides?.Stroke ?? options.Stroke,
             overrides?.Fill ?? options.Fill,
             (overrides?.StrokeWidth ?? options.StrokeWidth) * strokeMultiplier,
-            (overrides?.PointRadius ?? options.PointRadius) * PointMultiplier(strokeMultiplier));
+            (overrides?.PointRadius ?? options.PointRadius) * PointMultiplier(strokeMultiplier),
+            overrides?.MinFeaturePixels ?? options.MinFeaturePixels);
 
     // Point markers scale more gently than line strokes. The √2 stroke ramp is deliberately steep so
     // dense borders thin to faint hairlines at thumbnail/world scale (the whole point of the curve),
@@ -310,6 +314,20 @@ public static class MapRenderer
 
     static void DrawPolygon(Canvas canvas, Polygon polygon, Projection projection, ResolvedStyle style)
     {
+        // MinFeaturePixels: render-time cartographic selection. Drop this whole polygon — including
+        // its holes — if its outer ring's projected pixel bbox is below the threshold in both axes,
+        // so a country's tiny offshore islands disappear at world scale while its mainland (huge
+        // bbox) still paints. Holes are skipped along with their owner because a hole inside a
+        // dropped polygon has nothing to cut into. Applied per Polygon, NOT per MultiPolygon, since
+        // the Draw switch routes each MultiPolygon member here individually — exactly what we want
+        // for an archipelago country whose mainland survives and skerries don't.
+        if (style.MinFeaturePixels > 0
+            && polygon.Rings.Count > 0
+            && IsBelowMinPixels(polygon.Rings[0], projection, style.MinFeaturePixels))
+        {
+            return;
+        }
+
         // PreparePolygon yields one batch per output piece — for Goode that's one per lobe with
         // content. Fill uses the clipped closed rings (so the lobe-boundary closure participates
         // in even-odd fill), while strokes use the open polyline chains that omit any
@@ -327,6 +345,16 @@ public static class MapRenderer
 
     static void StrokePath(Canvas canvas, IReadOnlyList<Position> positions, Projection projection, ResolvedStyle style)
     {
+        // MinFeaturePixels filter, mirroring DrawPolygon. Applied per LineString — the Draw switch
+        // routes each MultiLineString member through here independently — so a major river's huge
+        // main channel renders while sub-pixel tributaries don't. A point-degenerate line (all
+        // vertices coincide) has a 0-pixel bbox and is filtered out for any positive threshold;
+        // that's correct, points are handled by their own switch case if the caller wanted them.
+        if (style.MinFeaturePixels > 0 && IsBelowMinPixels(positions, projection, style.MinFeaturePixels))
+        {
+            return;
+        }
+
         // PrepareLine yields one subpath per lobe the line crosses (just the input line itself for
         // non-interrupted projections). Each subpath stays in one lobe so consecutive vertices
         // never straddle the interrupt gap.
@@ -337,6 +365,52 @@ public static class MapRenderer
                 canvas.StrokeLine(subpath[i].X, subpath[i].Y, subpath[i + 1].X, subpath[i + 1].Y, style.StrokeWidth, style.Stroke);
             }
         }
+    }
+
+    // True if the projected pixel bbox of the supplied vertex sequence (a polygon's outer ring or a
+    // line's positions) is below `minPixels` in both axes — meaning the feature paints into less
+    // than minPixels × minPixels and so doesn't earn its visual weight at this scale.
+    //
+    // Cheap path: walk the vertices once to get the lon/lat bbox, then project the four corners.
+    // For linear projections (PlateCarree, WebMercator) the projected bbox of the lon/lat bbox is
+    // exactly the bbox of the projected ring. For non-linear projections (Lambert, Goode) it's an
+    // approximation, but for the sub-pixel features this filter exists to catch the projection is
+    // locally linear (a few km of latitude span) and the approximation is very tight. The
+    // alternative — project every vertex — costs O(vertices) for every feature, and the answer is
+    // identical for the small features we're filtering, so the corner-only test is the right
+    // engineering trade. Returns false for an empty sequence (nothing to filter).
+    static bool IsBelowMinPixels(IReadOnlyList<Position> positions, Projection projection, double minPixels)
+    {
+        if (positions.Count == 0)
+        {
+            return false;
+        }
+
+        double minLon = positions[0].X, maxLon = minLon, minLat = positions[0].Y, maxLat = minLat;
+        for (var i = 1; i < positions.Count; i++)
+        {
+            var p = positions[i];
+            if (p.X < minLon) minLon = p.X;
+            else if (p.X > maxLon) maxLon = p.X;
+            if (p.Y < minLat) minLat = p.Y;
+            else if (p.Y > maxLat) maxLat = p.Y;
+        }
+
+        var (x1, y1) = projection.ToPixel(new(minLon, minLat));
+        var (x2, y2) = projection.ToPixel(new(maxLon, minLat));
+        var (x3, y3) = projection.ToPixel(new(minLon, maxLat));
+        var (x4, y4) = projection.ToPixel(new(maxLon, maxLat));
+
+        var pxMin = Math.Min(Math.Min(x1, x2), Math.Min(x3, x4));
+        var pxMax = Math.Max(Math.Max(x1, x2), Math.Max(x3, x4));
+        var pyMin = Math.Min(Math.Min(y1, y2), Math.Min(y3, y4));
+        var pyMax = Math.Max(Math.Max(y1, y2), Math.Max(y3, y4));
+
+        // Strict <: a feature exactly minPixels across renders (the user asked to drop things
+        // *below* the threshold). max() rather than min(): a feature is kept if EITHER axis meets
+        // the threshold, dropped only when both are sub-threshold. A long thin coastline 1px wide
+        // and 200px long survives at minPixels=4; a 1×1 px island doesn't.
+        return Math.Max(pxMax - pxMin, pyMax - pyMin) < minPixels;
     }
 
     static void StrokeRing(Canvas canvas, (double X, double Y)[] ring, ResolvedStyle style)

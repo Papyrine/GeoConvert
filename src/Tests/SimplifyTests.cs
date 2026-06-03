@@ -300,8 +300,8 @@ public class SimplifyTests
         var eastRing = ((Polygon)result.Features[1].Geometry!).Rings[0];
 
         // The near-collinear (2, 2.001) is gone on both sides.
-        await Assert.That(westRing.Contains(new Position(2, 2.001))).IsFalse();
-        await Assert.That(eastRing.Contains(new Position(2, 2.001))).IsFalse();
+        await Assert.That(westRing.Contains(new(2, 2.001))).IsFalse();
+        await Assert.That(eastRing.Contains(new(2, 2.001))).IsFalse();
 
         // Both rings still close.
         await Assert.That(westRing[0]).IsEqualTo(westRing[^1]);
@@ -312,10 +312,10 @@ public class SimplifyTests
         // independently-simplified rings, still happen to agree on this trivial chord; the real
         // safety net is that topology shares the simplification rather than relying on chord
         // determinism for arbitrary inputs.)
-        await Assert.That(westRing.Contains(new Position(2, 0))).IsTrue();
-        await Assert.That(westRing.Contains(new Position(2, 4))).IsTrue();
-        await Assert.That(eastRing.Contains(new Position(2, 0))).IsTrue();
-        await Assert.That(eastRing.Contains(new Position(2, 4))).IsTrue();
+        await Assert.That(westRing.Contains(new(2, 0))).IsTrue();
+        await Assert.That(westRing.Contains(new(2, 4))).IsTrue();
+        await Assert.That(eastRing.Contains(new(2, 0))).IsTrue();
+        await Assert.That(eastRing.Contains(new(2, 4))).IsTrue();
     }
 
     // The headline case: a shared border with a meaningful kink that survives simplification.
@@ -347,8 +347,8 @@ public class SimplifyTests
 
         // The kink at (2.5, 2) sits 0.5 off the chord between the shared junctions (2,0) and (2,4),
         // far above the 0.1 tolerance, so it stays on both sides.
-        await Assert.That(westRing.Contains(new Position(2.5, 2))).IsTrue();
-        await Assert.That(eastRing.Contains(new Position(2.5, 2))).IsTrue();
+        await Assert.That(westRing.Contains(new(2.5, 2))).IsTrue();
+        await Assert.That(eastRing.Contains(new(2.5, 2))).IsTrue();
     }
 
     [Test]
@@ -370,7 +370,7 @@ public class SimplifyTests
 
         await Assert.That(ring.Count).IsEqualTo(5);
         await Assert.That(ring[0]).IsEqualTo(ring[^1]);
-        await Assert.That(ring.Contains(new Position(2, 0.001))).IsFalse();
+        await Assert.That(ring.Contains(new(2, 0.001))).IsFalse();
     }
 
     [Test]
@@ -453,8 +453,8 @@ public class SimplifyTests
         var line = (LineString)result.Features[0].Geometry!;
 
         await Assert.That(line.Positions.Count).IsEqualTo(2);
-        await Assert.That(line.Positions[0]).IsEqualTo(new Position(0, 0));
-        await Assert.That(line.Positions[1]).IsEqualTo(new Position(2, 0));
+        await Assert.That(line.Positions[0]).IsEqualTo(new(0, 0));
+        await Assert.That(line.Positions[1]).IsEqualTo(new(2, 0));
     }
 
     // Two lines sharing a vertex in the middle — that vertex is a junction in both, splitting each
@@ -477,9 +477,9 @@ public class SimplifyTests
         // Line A is split at (4,0). The near-collinear (2, 0.001) is dropped on its first arc,
         // and the (4,0) junction survives at the split — so line A reads as (0,0)-(4,0)-(4,4).
         await Assert.That(lineA.Positions.Count).IsEqualTo(3);
-        await Assert.That(lineA.Positions[0]).IsEqualTo(new Position(0, 0));
-        await Assert.That(lineA.Positions[1]).IsEqualTo(new Position(4, 0));
-        await Assert.That(lineA.Positions[2]).IsEqualTo(new Position(4, 4));
+        await Assert.That(lineA.Positions[0]).IsEqualTo(new(0, 0));
+        await Assert.That(lineA.Positions[1]).IsEqualTo(new(4, 0));
+        await Assert.That(lineA.Positions[2]).IsEqualTo(new(4, 4));
     }
 
     [Test]
@@ -548,14 +548,16 @@ public class SimplifyTests
             },
             Features =
             {
-                new Feature(new LineString([new(0, 0), new(1, 0.001), new(2, 0)]), new Dictionary<string, object?>
-                {
-                    ["name"] = "road"
-                })
+                new(
+                    new LineString([new(0, 0), new(1, 0.001), new(2, 0)]),
+                    new Dictionary<string, object?>
+                    {
+                        ["name"] = "road"
+                    })
                 {
                     Id = 7L,
                 },
-                new Feature(geometry: null),
+                new(geometry: null),
             },
         };
         var child = new FeatureCollection

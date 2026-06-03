@@ -158,10 +158,11 @@ public class SnapshotTests
         await Assert.That(source).StartsWith("data:image/png");
     }
 
-    // The sample map's download size is known up front (Content-Length), so its phase shows a determinate
-    // progress bar that fills as bytes arrive (unlike the indeterminate parse). Throttle the transfer via
-    // CDP so it spans several seconds, making the determinate fill and its byte-ratio label observable
-    // before the preview renders.
+    // The sample map's download phase shows an indeterminate progress bar (no determinate fill: the
+    // server's Content-Length is the compressed transport size while the bytes the WASM HttpClient
+    // yields are the decompressed payload, so a ratio would overshoot 100%). The detail line still
+    // ticks up with decompressed bytes received. Throttle the transfer via CDP so the phase spans
+    // several seconds, making the label and detail line observable before the preview renders.
     [Test]
     public async Task SampleWorldMapShowsDownloadProgress()
     {
@@ -182,16 +183,30 @@ public class SnapshotTests
 
         await page.ClickAsync(".sample-btn");
 
-        // The determinate fill (not the indeterminate variant) appears while bytes stream in.
-        await page.WaitForSelectorAsync(".progress-fill:not(.progress-fill-indeterminate)", new()
-        {
-            Timeout = 20000
-        });
+        // The download-phase label appears while bytes stream in.
+        await page.WaitForFunctionAsync(
+            "() => document.querySelector('.progress-label span')?.textContent?.includes('Downloading')",
+            null,
+            new()
+            {
+                Timeout = 20000
+            });
 
-        // Its label names the download phase and carries a byte-ratio detail (e.g. "1.2 / 19.4 MB").
-        var label = await page.TextContentAsync(".progress-label");
-        await Assert.That(label).Contains("Downloading");
-        await Assert.That(label).Contains("MB");
+        // The bar is indeterminate (no honest decoded total is available up front) and the detail line
+        // shows a single byte count, not a "X / Y" ratio. Wait for the count to climb into MB so we
+        // don't race the very first 64 KB chunk.
+        var fillClass = await page.GetAttributeAsync(".progress-fill", "class");
+        await Assert.That(fillClass).Contains("progress-fill-indeterminate");
+        await page.WaitForFunctionAsync(
+            "() => document.querySelector('.progress-count')?.textContent?.includes('MB')",
+            null,
+            new()
+            {
+                Timeout = 20000
+            });
+        var detail = await page.TextContentAsync(".progress-count");
+        await Assert.That(detail).Contains("MB");
+        await Assert.That(detail).DoesNotContain("/");
 
         // And the load still completes to a rendered preview afterwards.
         await page.WaitForSelectorAsync(".preview img", new()

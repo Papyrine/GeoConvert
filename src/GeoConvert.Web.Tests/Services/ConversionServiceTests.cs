@@ -146,7 +146,9 @@ public class ConversionServiceTests
         }
 
         var filtered = ConversionService.RenderPng(subPixel, MapProjection.PlateCarree, 256);
-        var unfiltered = MapRenderer.RenderPng(subPixel, new RenderOptions
+        var unfiltered = MapRenderer.RenderPng(
+            subPixel,
+            new()
         {
             Projection = MapProjection.PlateCarree,
             MaxDimension = 256,
@@ -161,8 +163,7 @@ public class ConversionServiceTests
         });
 
         await Assert.That(filtered.Length).IsLessThan(unfiltered.Length)
-            .Because($"filtered={filtered.Length} bytes, unfiltered={unfiltered.Length} bytes; "
-                + "the only difference is the sub-pixel polygon's paint, so MinFeaturePixels=1 must drop it.");
+            .Because($"filtered={filtered.Length} bytes, unfiltered={unfiltered.Length} bytes; the only difference is the sub-pixel polygon's paint, so MinFeaturePixels=1 must drop it.");
     }
 
     [Test]

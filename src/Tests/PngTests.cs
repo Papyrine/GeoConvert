@@ -92,10 +92,10 @@ public class PngTests
         var png = MapRenderer.RenderPng(
             features,
             new()
-        {
-            Width = 128,
-            Height = 128
-        });
+            {
+                Width = 128,
+                Height = 128
+            });
         await Assert.That(png[..8]).IsEquivalentTo(signature);
     }
 
@@ -237,7 +237,10 @@ public class PngTests
                     : null,
                 // Dark dots for the cities; the border keeps the default brown outline above.
                 LayerStyle = layer => ReferenceEquals(layer, cities)
-                    ? new() { Stroke = new(60, 60, 60) }
+                    ? new()
+                    {
+                        Stroke = new(60, 60, 60)
+                    }
                     : null,
             });
 
@@ -1173,8 +1176,18 @@ public class PngTests
             Projection = MapProjection.PlateCarree,
             LayerStyle = layer => layer.Name switch
             {
-                "lower" => new() { Fill = new(20, 200, 20), Stroke = new(20, 200, 20), StrokeWidth = 2 },
-                "upper" => new() { Fill = new(220, 30, 30), Stroke = new(220, 30, 30), StrokeWidth = 2 },
+                "lower" => new()
+                {
+                    Fill = new(20, 200, 20),
+                    Stroke = new(20, 200, 20),
+                    StrokeWidth = 2
+                },
+                "upper" => new()
+                {
+                    Fill = new(220, 30, 30),
+                    Stroke = new(220, 30, 30),
+                    StrokeWidth = 2
+                },
                 _ => null,
             },
         };
@@ -1491,20 +1504,20 @@ public class PngTests
                 features,
                 new()
                 {
-            Bounds = bounds,
-            Width = 1024,
-            Height = 1024,
-            MinFeaturePixels = 4,
-        })).Rgba;
+                    Bounds = bounds,
+                    Width = 1024,
+                    Height = 1024,
+                    MinFeaturePixels = 4,
+                })).Rgba;
         var unfilteredPixels = Decode(
             MapRenderer.RenderPng(
                 features,
                 new()
                 {
-            Bounds = bounds,
-            Width = 1024,
-            Height = 1024,
-        })).Rgba;
+                    Bounds = bounds,
+                    Width = 1024,
+                    Height = 1024,
+                })).Rgba;
 
         var filteredCount = NonBackgroundCount(filteredPixels);
         var unfilteredCount = NonBackgroundCount(unfilteredPixels);
@@ -1529,8 +1542,14 @@ public class PngTests
             MinFeaturePixels = 4,
         };
 
-        var tiny = new FeatureCollection { new Feature(new LineString([new(0, 0), new(0.001, 0.001)])) };
-        var big = new FeatureCollection { new Feature(new LineString([new(-20, -20), new(20, 20)])) };
+        var tiny = new FeatureCollection
+        {
+            new Feature(new LineString([new(0, 0), new(0.001, 0.001)]))
+        };
+        var big = new FeatureCollection
+        {
+            new Feature(new LineString([new(-20, -20), new(20, 20)]))
+        };
 
         await Assert.That(NonBackgroundCount(Decode(MapRenderer.RenderPng(tiny, options)).Rgba)).IsEqualTo(0);
         await Assert.That(NonBackgroundCount(Decode(MapRenderer.RenderPng(big, options)).Rgba)).IsGreaterThan(0);
@@ -1548,16 +1567,27 @@ public class PngTests
         // pixels the root already painted) and the assertion below becomes vacuous.
         var rootTiny = new Polygon([[new(-15, -15), new(-14.999, -15), new(-14.999, -14.999), new(-15, -14.999), new(-15, -15)]]);
         var childTiny = new Polygon([[new(15, 15), new(15.001, 15), new(15.001, 15.001), new(15, 15.001), new(15, 15)]]);
-        var child = new FeatureCollection { new Feature(childTiny) };
+        var child = new FeatureCollection
+        {
+            new Feature(childTiny)
+        };
         child.Name = "child";
-        var root = new FeatureCollection { new Feature(rootTiny) };
+        var root = new FeatureCollection
+        {
+            new Feature(rootTiny)
+        };
         root.Children.Add(child);
         var options = new RenderOptions
         {
             Bounds = new Envelope(-25, -25, 25, 25),
             Width = 1024,
             Height = 1024,
-            LayerStyle = layer => layer.Name == "child" ? new LayerStyle { MinFeaturePixels = 4 } : null,
+            LayerStyle = layer => layer.Name == "child"
+                ? new LayerStyle
+                {
+                    MinFeaturePixels = 4
+                }
+                : null,
         };
 
         // Hard to assert "child filtered AND root not" by pixel count alone (both polygons paint
@@ -1566,14 +1596,27 @@ public class PngTests
         // between them — more painted pixels than fully-filtered (root survived), fewer than
         // fully-unfiltered (child dropped).
         var overrideOnly = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, options)).Rgba);
-        var bothFiltered = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, new RenderOptions
-        {
-            Bounds = options.Bounds, Width = 1024, Height = 1024, MinFeaturePixels = 4,
-        })).Rgba);
-        var noneFiltered = NonBackgroundCount(Decode(MapRenderer.RenderPng(root, new RenderOptions
-        {
-            Bounds = options.Bounds, Width = 1024, Height = 1024,
-        })).Rgba);
+        var bothFiltered = NonBackgroundCount(
+            Decode(
+                MapRenderer.RenderPng(
+                    root,
+                    new()
+                    {
+                        Bounds = options.Bounds,
+                        Width = 1024,
+                        Height = 1024,
+                        MinFeaturePixels = 4,
+                    })).Rgba);
+        var noneFiltered = NonBackgroundCount(
+            Decode(
+                MapRenderer.RenderPng(
+                    root,
+                    new()
+                    {
+                        Bounds = options.Bounds,
+                        Width = 1024,
+                        Height = 1024,
+                    })).Rgba);
 
         await Assert.That(bothFiltered).IsEqualTo(0).Because("both filters on → canvas all-background");
         await Assert.That(overrideOnly).IsGreaterThan(0).Because("root layer survived because root MinFeaturePixels is 0");

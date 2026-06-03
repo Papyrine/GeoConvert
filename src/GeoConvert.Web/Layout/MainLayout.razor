@@ -2,25 +2,6 @@
 @inject ThemePreferenceService ThemePreferenceService
 @inject IJSRuntime JSRuntime
 
-@code {
-    ThemeType currentTheme = ThemeType.Light;
-    string? userAgent;
-
-    protected override async Task OnInitializedAsync()
-    {
-        currentTheme = await ThemePreferenceService.GetSavedThemeAsync();
-        await JSRuntime.InvokeVoidAsync("themeManager.applyTheme", currentTheme.ToString());
-        userAgent = await JSRuntime.InvokeAsync<string?>("appInfo.userAgent");
-    }
-
-    async Task HandleThemeChanged(ThemeType newTheme)
-    {
-        currentTheme = newTheme;
-        await ThemePreferenceService.SaveThemeAsync(newTheme);
-        await JSRuntime.InvokeVoidAsync("themeManager.applyTheme", newTheme.ToString());
-    }
-}
-
 <header>
     <h1>GeoConvert</h1>
     <p>Convert maps between GeoJSON, TopoJSON, FlatGeobuf, KML/KMZ, GPX, WKT, WKB, CSV and GeoParquet — entirely in your browser</p>

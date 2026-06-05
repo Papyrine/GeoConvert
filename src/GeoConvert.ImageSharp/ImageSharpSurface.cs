@@ -16,7 +16,9 @@ namespace GeoConvert.ImageSharp;
 /// Coordinates are canvas pixel space (X right, Y down), the same convention ImageSharp uses, so
 /// positions pass straight through. Fills, strokes and discs are antialiased.
 /// </summary>
-sealed class ImageSharpSurface : IRenderSurface, IDisposable
+sealed class ImageSharpSurface(int width, int height, Rgba background) :
+    IRenderSurface,
+    IDisposable
 {
     static readonly DrawingOptions evenOdd = new()
     {
@@ -43,18 +45,11 @@ sealed class ImageSharpSurface : IRenderSurface, IDisposable
     // doesn't change between renders.
     static FontFamily? cachedFamily;
 
-    readonly Image<Rgba32> image;
+    readonly Image<Rgba32> image = new(width, height, ToPixel(background));
 
-    public int Width { get; }
+    public int Width { get; } = width;
 
-    public int Height { get; }
-
-    public ImageSharpSurface(int width, int height, Rgba background)
-    {
-        Width = width;
-        Height = height;
-        image = new(width, height, ToPixel(background));
-    }
+    public int Height { get; } = height;
 
     public void FillPolygon((double X, double Y)[][] rings, Rgba color)
     {

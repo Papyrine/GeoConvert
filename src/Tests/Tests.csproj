@@ -17,6 +17,8 @@
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
     <ProjectReference Include="..\GeoConvert.Cli\GeoConvert.Cli.csproj" />
+    <ProjectReference Include="..\GeoConvert.Skia\GeoConvert.Skia.csproj" />
+    <ProjectReference Include="..\GeoConvert.ImageSharp\GeoConvert.ImageSharp.csproj" />
   </ItemGroup>
 
   <ItemGroup>

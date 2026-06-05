@@ -2,6 +2,8 @@
 
 [![Build status](https://img.shields.io/appveyor/build/SimonCropp/GeoConvert)](https://ci.appveyor.com/project/SimonCropp/GeoConvert)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert)](https://www.nuget.org/packages/GeoConvert/)
+[![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.ImageSharp)](https://www.nuget.org/packages/GeoConvert.ImageSharp/)
+[![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.Skia)](https://www.nuget.org/packages/GeoConvert.Skia/)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.Cli.svg?label=GeoConvert.Cli)](https://www.nuget.org/packages/GeoConvert.Cli/)
 
 Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries (`System.Text.Json`, `System.Xml`, `System.IO.Compression`). It can also render a bounding box to a PNG raster or an SVG vector image. Ships as a library and a `geoconvert` command line tool.
@@ -184,6 +186,28 @@ MapRenderer.RenderPng(features, "europe.png", options);
 
 ```
 geoconvert world.geojson europe.png --bbox -10,35,30,60 --size 1200x900
+```
+
+### Alternative render backends (ImageSharp / Skia)
+
+The core library stays dependency-free, but two opt-in companion packages render the *same* scene — identical projection, per-layer styling, stroke autoscaling and label placement — through a third-party rasterizer instead of the built-in one, trading the no-dependency guarantee for the library's antialiased fills and native text:
+
+- [`GeoConvert.Skia`](https://www.nuget.org/packages/GeoConvert.Skia) — renders through [SkiaSharp](https://github.com/mono/SkiaSharp) (MIT).
+- [`GeoConvert.ImageSharp`](https://www.nuget.org/packages/GeoConvert.ImageSharp) — renders through [SixLabors.ImageSharp](https://github.com/SixLabors/ImageSharp) (Six Labors Split License — free for OSS/personal use; commercial use may require a paid license).
+
+Each exposes a `*Renderer` class whose `RenderPng` overloads mirror `MapRenderer.RenderPng` (single collection or a stacked list; to `byte[]`, a path, or a `Stream`) and honour the same `RenderOptions`. Labels are drawn with a native font (Skia's default typeface; an installed system sans-serif for ImageSharp):
+
+```cs
+using GeoConvert.Skia;
+
+var features = GeoConverter.Read("world.geojson");
+SkiaRenderer.RenderPng(features, "world.png", new() { Width = 2048 });
+```
+
+From the command line, select the backend with `--renderer skia|imagesharp` (default `builtin`):
+
+```
+geoconvert world.geojson world.png --renderer skia --size 2048
 ```
 
 

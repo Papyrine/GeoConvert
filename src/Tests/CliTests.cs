@@ -103,6 +103,91 @@ public class CliTests
     }
 
     [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task RendersPngWithAlternativeBackend(string backend)
+    {
+        using var directory = new TempDirectory();
+
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.png");
+
+        var code = Runner.Run(
+            [input, output, "--bbox", "-1,-1,16,16", "--size", "128x128", "--renderer", backend],
+            new StringWriter(),
+            new StringWriter());
+
+        await Assert.That(code).IsEqualTo(0);
+        await Assert.That(File.Exists(output)).IsTrue();
+        await Assert.That((await File.ReadAllBytesAsync(output))[..4])
+            .IsEquivalentTo(new byte[]
+            {
+                0x89,
+                0x50,
+                0x4E,
+                0x47
+            });
+    }
+
+    [Test]
+    public async Task RendersPngWithExplicitBuiltinRenderer()
+    {
+        using var directory = new TempDirectory();
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.png");
+
+        var code = Runner.Run(
+            [input, output, "--bbox", "-1,-1,16,16", "--size", "64x64", "--renderer", "builtin"],
+            new StringWriter(),
+            new StringWriter());
+
+        await Assert.That(code).IsEqualTo(0);
+        await Assert.That(File.Exists(output)).IsTrue();
+    }
+
+    [Test]
+    public async Task MissingRendererValueReturnsError()
+    {
+        var error = new StringWriter();
+        var code = Runner.Run(["in.geojson", "out.png", "--renderer"], new StringWriter(), error);
+
+        await Assert.That(code).IsEqualTo(2);
+        await Assert.That(error.ToString()).Contains("Missing value for --renderer");
+    }
+
+    [Test]
+    public async Task RejectsUnknownRenderer()
+    {
+        using var directory = new TempDirectory();
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.png");
+        var error = new StringWriter();
+
+        var code = Runner.Run([input, output, "--renderer", "nope"], new StringWriter(), error);
+
+        await Assert.That(code).IsEqualTo(2);
+        await Assert.That(error.ToString()).Contains("--renderer");
+    }
+
+    [Test]
+    public async Task RejectsAlternativeRendererForSvg()
+    {
+        using var directory = new TempDirectory();
+        var input = Path.Combine(directory, "in.geojson");
+        await File.WriteAllTextAsync(input, GeoJson.WriteString(Sample.Polygons()));
+        var output = Path.Combine(directory, "out.svg");
+        var error = new StringWriter();
+
+        var code = Runner.Run([input, output, "--renderer", "skia"], new StringWriter(), error);
+
+        await Assert.That(code).IsEqualTo(2);
+        await Assert.That(error.ToString()).Contains("PNG output only");
+    }
+
+    [Test]
     public async Task RendersSvgWithBoundingBox()
     {
         using var directory = new TempDirectory();

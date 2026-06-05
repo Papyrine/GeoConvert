@@ -1,4 +1,6 @@
 using System.Globalization;
+using GeoConvert.ImageSharp;
+using GeoConvert.Skia;
 
 namespace GeoConvert.Cli;
 
@@ -37,6 +39,7 @@ public static class Runner
         var height = 0;
         var maxDimension = 0;
         var projection = MapProjection.Auto;
+        var renderer = RenderBackend.BuiltIn;
         double? simplifyTolerance = null;
         var simplifyMethod = SimplifyMethod.DouglasPeucker;
         var simplifyTopology = false;
@@ -113,6 +116,20 @@ public static class Runner
                     if (!TryParseProjection(args[++i], out projection))
                     {
                         error.WriteLine("--projection must be 'auto', 'plate-carree', 'web-mercator', 'lambert', or 'goode'.");
+                        return 2;
+                    }
+
+                    break;
+                case "--renderer":
+                    if (i + 1 >= args.Length)
+                    {
+                        error.WriteLine("Missing value for --renderer.");
+                        return 2;
+                    }
+
+                    if (!TryParseRenderer(args[++i], out renderer))
+                    {
+                        error.WriteLine("--renderer must be 'builtin', 'skia', or 'imagesharp'.");
                         return 2;
                     }
 
@@ -305,6 +322,14 @@ public static class Runner
 
             if (toFormat is GeoFormat.Png or GeoFormat.Svg)
             {
+                // The alternative backends are PNG rasterizers; SVG is always emitted by the built-in
+                // vector writer. Reject the combination rather than silently ignoring the flag.
+                if (renderer != RenderBackend.BuiltIn && toFormat == GeoFormat.Svg)
+                {
+                    error.WriteLine("--renderer applies to PNG output only; SVG always uses the built-in renderer.");
+                    return 2;
+                }
+
                 var renderOptions = new RenderOptions
                 {
                     Bounds = bounds,
@@ -354,7 +379,18 @@ public static class Runner
 
                 if (toFormat == GeoFormat.Png)
                 {
-                    MapRenderer.RenderPng(features, outputPath, renderOptions);
+                    switch (renderer)
+                    {
+                        case RenderBackend.Skia:
+                            SkiaRenderer.RenderPng(features, outputPath, renderOptions);
+                            break;
+                        case RenderBackend.ImageSharp:
+                            ImageSharpRenderer.RenderPng(features, outputPath, renderOptions);
+                            break;
+                        default:
+                            MapRenderer.RenderPng(features, outputPath, renderOptions);
+                            break;
+                    }
                 }
                 else
                 {
@@ -432,6 +468,31 @@ public static class Runner
                 return true;
             default:
                 projection = default;
+                return false;
+        }
+    }
+
+    static bool TryParseRenderer(string text, out RenderBackend renderer)
+    {
+        switch (text.ToLowerInvariant())
+        {
+            case "builtin":
+            case "built-in":
+            case "default":
+            case "geoconvert":
+                renderer = RenderBackend.BuiltIn;
+                return true;
+            case "skia":
+            case "skiasharp":
+                renderer = RenderBackend.Skia;
+                return true;
+            case "imagesharp":
+            case "image-sharp":
+            case "sixlabors":
+                renderer = RenderBackend.ImageSharp;
+                return true;
+            default:
+                renderer = default;
                 return false;
         }
     }
@@ -556,6 +617,10 @@ public static class Runner
                                      goode for world), 'plate-carree', 'web-mercator', 'lambert'
                                      (Lambert Conformal Conic, low distortion at country/state
                                      scale), or 'goode' (Goode's Homolosine, equal-area world map).
+              --renderer <name>      PNG only: which rasterizer to use. 'builtin' (default) is the
+                                     dependency-free software renderer; 'skia' uses SkiaSharp and
+                                     'imagesharp' uses SixLabors.ImageSharp (both add a third-party
+                                     dependency and draw labels with a native system font).
               --label <property>     PNG/SVG only: render each feature's property value as a text label
                                      (single-stroke vector font; printable ASCII plus Latin
                                      diacritics, ligatures like ß/æ/ø render as '?'). Polygon/line
@@ -588,6 +653,7 @@ public static class Runner
               geoconvert states.geojson states.png --projection lambert --size 1600
               geoconvert world.geojson world.png --projection goode --size 1600
               geoconvert cities.geojson cities.png --label name --label-size 18
+              geoconvert world.geojson world.png --renderer skia --size 2048
               geoconvert world.geojson world.svg --bbox -10,35,30,60 --size 1200x900
             """);
 
@@ -609,4 +675,12 @@ public static class Runner
               png        .png (write-only; use --bbox and --size)
               svg        .svg (write-only vector; use --bbox and --size)
             """);
+}
+
+/// <summary>The PNG rasterizer the CLI dispatches to, selected by <c>--renderer</c>.</summary>
+enum RenderBackend
+{
+    BuiltIn,
+    Skia,
+    ImageSharp,
 }

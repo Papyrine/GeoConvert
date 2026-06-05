@@ -12,6 +12,10 @@
 
   <ItemGroup>
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
+    <!-- Alternative PNG render backends, surfaced via the renderer flag. These pull third-party
+         dependencies (SkiaSharp, SixLabors.ImageSharp) into the tool; the core stays dependency-free. -->
+    <ProjectReference Include="..\GeoConvert.Skia\GeoConvert.Skia.csproj" />
+    <ProjectReference Include="..\GeoConvert.ImageSharp\GeoConvert.ImageSharp.csproj" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
   </ItemGroup>

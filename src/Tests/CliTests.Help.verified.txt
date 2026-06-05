@@ -31,6 +31,10 @@ Options:
                          goode for world), 'plate-carree', 'web-mercator', 'lambert'
                          (Lambert Conformal Conic, low distortion at country/state
                          scale), or 'goode' (Goode's Homolosine, equal-area world map).
+  --renderer <name>      PNG only: which rasterizer to use. 'builtin' (default) is the
+                         dependency-free software renderer; 'skia' uses SkiaSharp and
+                         'imagesharp' uses SixLabors.ImageSharp (both add a third-party
+                         dependency and draw labels with a native system font).
   --label <property>     PNG/SVG only: render each feature's property value as a text label
                          (single-stroke vector font; printable ASCII plus Latin
                          diacritics, ligatures like ß/æ/ø render as '?'). Polygon/line
@@ -63,4 +67,5 @@ Examples:
   geoconvert states.geojson states.png --projection lambert --size 1600
   geoconvert world.geojson world.png --projection goode --size 1600
   geoconvert cities.geojson cities.png --label name --label-size 18
+  geoconvert world.geojson world.png --renderer skia --size 2048
   geoconvert world.geojson world.svg --bbox -10,35,30,60 --size 1200x900

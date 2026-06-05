@@ -222,6 +222,31 @@ public static class MapRenderer
         Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, options.Compression);
     }
 
+    /// <summary>
+    /// Paints the shared render pass — projection, per-layer styling, stroke auto-scaling and label
+    /// placement — into a caller-supplied <see cref="IRenderSurface"/>, then returns the painted
+    /// surface. This is the extension seam the alternative PNG backends (GeoConvert.ImageSharp and
+    /// GeoConvert.Skia) build on: each implements <see cref="IRenderSurface"/> over its own
+    /// rasterizer and encodes the painted surface itself, reusing every pixel of this pipeline so the
+    /// only things that differ from the built-in renderer are the primitive sink and the final PNG
+    /// encode. <paramref name="createSurface"/> is handed the projected canvas size in pixels (width,
+    /// height) and must return a surface of exactly that size. Bounds and size validation run first,
+    /// so an empty collection or a non-positive width throws <see cref="GeoConvertException"/> before
+    /// the factory is invoked.
+    /// </summary>
+    internal static TSurface PaintSurface<TSurface>(
+        IReadOnlyList<FeatureCollection> layers,
+        RenderOptions options,
+        Func<int, int, TSurface> createSurface)
+        where TSurface : IRenderSurface
+    {
+        var bounds = Validate(layers, options);
+        var projection = new Projection(bounds, options);
+        var surface = createSurface(projection.Width, projection.Height);
+        Paint(surface, projection, layers, options, bounds, null);
+        return surface;
+    }
+
     // Renders the scene into the given surface (raster or vector) — every pass below is written
     // against IRenderSurface so PNG and SVG share the projection, styling, stroke autoscaling and
     // label placement, differing only in how each entry point builds the surface and finalises the

@@ -11,8 +11,6 @@
     <None Include="nuget-readme.md" Pack="true" PackagePath="\readme.md" Visible="false" />
     <PackageReference Include="SkiaSharp" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
-    <!-- The library compiles GeoConvert's Polyfill copy in via InternalsVisibleTo, so this project must
-         not reference Polyfill itself (a second copy causes ambiguous-extension build errors). -->
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
   </ItemGroup>
 

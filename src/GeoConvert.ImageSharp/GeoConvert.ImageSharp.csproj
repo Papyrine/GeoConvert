@@ -12,8 +12,6 @@
     <PackageReference Include="SixLabors.ImageSharp" />
     <PackageReference Include="SixLabors.ImageSharp.Drawing" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
-    <!-- The library compiles GeoConvert's Polyfill copy in via InternalsVisibleTo, so this project must
-         not reference Polyfill itself (a second copy causes ambiguous-extension build errors). -->
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
   </ItemGroup>
 

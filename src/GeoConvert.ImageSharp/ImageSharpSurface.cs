@@ -78,7 +78,7 @@ sealed class ImageSharpSurface : IRenderSurface, IDisposable
         }
 
         var path = builder.Build();
-        image.Mutate(_ => _.Fill(evenOdd, ToColor(color), path));
+        image.Mutate(_ => _.Paint(evenOdd, _ => _.Fill(ToBrush(color), path)));
     }
 
     public void StrokePath(IReadOnlyList<(double X, double Y)> points, double width, Rgba color)
@@ -99,19 +99,19 @@ sealed class ImageSharpSurface : IRenderSurface, IDisposable
         builder.AddLines(vertices);
         var path = builder.Build();
         var pen = Pens.Solid(ToColor(color), (float)width);
-        image.Mutate(_ => _.Draw(antialiased, pen, path));
+        image.Mutate(_ => _.Paint(antialiased, _ => _.Draw(pen, path)));
     }
 
     public void FillDisc(double cx, double cy, double radius, Rgba color)
     {
         var disc = new EllipsePolygon((float)cx, (float)cy, (float)radius);
-        image.Mutate(_ => _.Fill(antialiased, ToColor(color), disc));
+        image.Mutate(_ => _.Paint(antialiased, _ => _.Fill(ToBrush(color), disc)));
     }
 
     public void FillRect(double x0, double y0, double x1, double y1, Rgba color)
     {
-        var rectangle = new RectangularPolygon((float)x0, (float)y0, (float)(x1 - x0), (float)(y1 - y0));
-        image.Mutate(_ => _.Fill(antialiased, ToColor(color), rectangle));
+        var rectangle = new RectanglePolygon((float)x0, (float)y0, (float)(x1 - x0), (float)(y1 - y0));
+        image.Mutate(_ => _.Paint(antialiased, _ => _.Fill(ToBrush(color), rectangle)));
     }
 
     public void DrawText(string text, double leftX, double baselineY, double size, Rgba color, Rgba? halo)
@@ -135,10 +135,10 @@ sealed class ImageSharpSurface : IRenderSurface, IDisposable
             // foreground colour on top instead of letting the outline eat into it.
             var haloBrush = new SolidBrush(ToColor(haloColor));
             var haloPen = Pens.Solid(ToColor(haloColor), Math.Max(1f, emSize / 6f));
-            image.Mutate(_ => _.DrawText(textOptions, text, haloBrush, haloPen));
+            image.Mutate(_ => _.Paint(_ => _.DrawText(textOptions, text, haloBrush, haloPen)));
         }
 
-        image.Mutate(_ => _.DrawText(textOptions, text, ToColor(color)));
+        image.Mutate(_ => _.Paint(_ => _.DrawText(textOptions, text, ToBrush(color), null)));
     }
 
     /// <summary>Encodes the painted image as a PNG to <paramref name="stream"/>, mapping
@@ -198,6 +198,9 @@ sealed class ImageSharpSurface : IRenderSurface, IDisposable
 
         return points;
     }
+
+    static SolidBrush ToBrush(Rgba color) =>
+        new(ToColor(color));
 
     static Color ToColor(Rgba color) =>
         Color.FromPixel(ToPixel(color));

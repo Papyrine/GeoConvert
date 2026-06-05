@@ -2,6 +2,8 @@
 
 [![Build status](https://img.shields.io/appveyor/build/SimonCropp/GeoConvert)](https://ci.appveyor.com/project/SimonCropp/GeoConvert)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert)](https://www.nuget.org/packages/GeoConvert/)
+[![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.ImageSharp)](https://www.nuget.org/packages/GeoConvert.ImageSharp/)
+[![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.Skia)](https://www.nuget.org/packages/GeoConvert.Skia/)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.Cli.svg?label=GeoConvert.Cli)](https://www.nuget.org/packages/GeoConvert.Cli/)
 
 Convert maps between geospatial formats, with **no third-party dependencies** — only the .NET base class libraries (`System.Text.Json`, `System.Xml`, `System.IO.Compression`). It can also render a bounding box to a PNG raster or an SVG vector image. Ships as a library and a `geoconvert` command line tool.

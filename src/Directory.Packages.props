@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="ProjectDefaults" Version="1.0.174" />
-    <PackageVersion Include="SponsorCheck" Version="0.7.0" GitHubSponsorsAccount="Papyrine" SponsorOwner="Papyrine" CheckTransitiveReferences="true" SponsorLandingUrl="https://github.com/sponsors/Papyrine" />
+    <PackageVersion Include="SponsorCheck" Version="0.8.0" GitHubSponsorsAccount="Papyrine" SponsorOwner="Papyrine" CheckTransitiveReferences="true" SponsorLandingUrl="https://github.com/sponsors/Papyrine" />
     <PackageVersion Include="Polyfill" Version="10.8.0" />
     <PackageVersion Include="System.IO.Hashing" Version="10.0.8" />
     <PackageVersion Include="SkiaSharp" Version="3.119.4" />

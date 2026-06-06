@@ -335,9 +335,9 @@ public static class MapRenderer
             (overrides?.PointRadius ?? options.PointRadius) * PointMultiplier(strokeMultiplier),
             overrides?.MinFeaturePixels ?? options.MinFeaturePixels);
 
-    // Point markers scale more gently than line strokes. The √2 stroke ramp is deliberately steep so
-    // dense borders thin to faint hairlines at thumbnail/world scale (the whole point of the curve),
-    // but applying that same ramp to point radii shrinks city/town dots to near-invisible specks at
+    // Point markers scale more gently than line strokes. The stroke ramp still thins borders down at
+    // thumbnail/world scale (the whole point of the curve), but applying that same ramp to point radii
+    // shrinks city/town dots to near-invisible specks at
     // country scale — where a dot still has to read as a dot. So split the difference: average the
     // stroke multiplier with 1.0 (the un-scaled, fixed-pixel size), pulling the marker halfway back
     // toward its base radius. At strokeMultiplier 1 (autoscale off, or exactly at the anchor zoom)
@@ -346,18 +346,19 @@ public static class MapRenderer
     static double PointMultiplier(double strokeMultiplier) =>
         (strokeMultiplier + 1) / 2;
 
-    // Stroke-width multiplier curve. The multiplier halves for every two implicit zoom levels below
-    // the country-scale anchor and doubles for every two above it — base √2 per zoom level. That's a
-    // far steeper ramp than the tile-map ~1.15×/level convention, on purpose: a *static* render of a
-    // fixed dataset wants its strokes roughly proportional to the output's pixel density (halve the
-    // canvas → halve the stroke), so a thumbnail of a dense map reads as thin faint hairlines instead
-    // of a black mass, while a tightly-zoomed render gets substantial borders. The lower clamp is low
-    // enough that a whole-world thumbnail still thins right down (StrokeLine's coverage compensation
-    // then renders that as a faint hairline rather than nothing); the upper clamp caps street-level
-    // zooms before the stroke swallows the canvas.
-    const double strokeZoomBase = 1.4142135623730951; // √2
+    // Stroke-width multiplier curve. The multiplier halves for every three implicit zoom levels below
+    // the country-scale anchor and doubles for every three above it — base 2^(1/3) per zoom level.
+    // That's still a steeper ramp than the tile-map ~1.15×/level convention, on purpose: a *static*
+    // render of a fixed dataset wants its strokes roughly proportional to the output's pixel density,
+    // so a thumbnail of a dense map reads as thinner borders instead of a black mass, while a
+    // tightly-zoomed render gets substantial borders. The earlier √2 (halve-every-two) ramp combined
+    // with a near-zero lower clamp thinned borders so hard that a sparse zoomed-out map (a handful of
+    // countries) lost its outlines almost entirely; this gentler ramp plus a higher lower clamp keeps
+    // them visible, and StrokeLine's coverage-fade floor stops the residual sub-pixel widths from
+    // fading to nothing. The upper clamp caps street-level zooms before the stroke swallows the canvas.
+    const double strokeZoomBase = 1.2599210498948732; // 2^(1/3): halve every three zoom levels
     const int strokeZoomAnchor = 10;
-    const double strokeMultiplierMin = 0.1;
+    const double strokeMultiplierMin = 0.25;
     const double strokeMultiplierMax = 6;
 
     /// <summary>
@@ -365,7 +366,7 @@ public static class MapRenderer
     /// of tile-map zoom-aware styling. Uses the smaller of the horizontal and vertical
     /// pixels-per-degree (the axis that actually fits the rendered extent), converts to an
     /// implicit zoom via the tile-map convention (zoom = log2(width-at-360° / 256)), then scales the
-    /// multiplier by <see cref="strokeZoomBase"/> (√2) per zoom level with zoom
+    /// multiplier by <see cref="strokeZoomBase"/> (2^(1/3)) per zoom level with zoom
     /// <see cref="strokeZoomAnchor"/> (country-scale) as the multiplier-of-1 baseline. Clamped to
     /// [<see cref="strokeMultiplierMin"/>, <see cref="strokeMultiplierMax"/>] so a degenerate bbox
     /// doesn't blow the multiplier to infinity or zero.

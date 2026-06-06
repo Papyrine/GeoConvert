@@ -87,15 +87,17 @@ Hub-and-spoke around one in-memory model:
 - **Hand-rolled internals** (`src/GeoConvert/Internal/`) exist because of the no-dependency rule:
   `FlatBufferBuilder`/`FlatBufferTable` (FlatGeobuf's FlatBuffers wire format), `Dbf` (dBASE attribute
   table), `WktParser`, `CsvParser`, `Png` (encoder, uses BCL `ZLibStream` + `System.IO.Hashing.Crc32`),
-  `Canvas` (software rasterizer with even-odd polygon fill and antialiased thick-line strokes / disc
-  fills via fractional-coverage blending; sub-pixel-width strokes are coverage-compensated — the
-  geometric radius can't drop below 0.5px so a sub-1px line is drawn as a 1px band with its alpha
-  faded by the requested width, rendering as a faint hairline rather than a solid stroke, which is
-  what keeps `StrokeAutoScale`'s thinned-down borders from blacking out a dense map; the scale is
-  continuous at width 1 so any width ≥ 1 is byte-identical to before; polygon fill edges are binary —
-  sharp boundaries where
-  filled features meet untextured background still show stair-stepping, but in typical configs the
-  polygon's stroke covers its fill edge), `Ring` (orientation), `Scalars`/`JsonValue`
+  `Canvas` (software rasterizer with antialiased even-odd polygon fill, thick-line strokes and disc
+  fills, all via fractional-coverage blending; the polygon fill accumulates coverage from four vertical
+  sub-scanlines per row plus analytic horizontal coverage at the span ends, so diagonal/curved fill
+  edges come out smooth rather than stair-stepped — fully-interior pixels still hit exactly coverage 1.0
+  and reuse the opaque whole-pixel / SIMD translucent-span fast paths, so only edge pixels pay the
+  per-pixel blend; sub-pixel-width strokes are coverage-compensated — the geometric radius can't drop
+  below 0.5px so a sub-1px line is drawn as a 1px band with its alpha faded by the requested width but
+  never below 50% (the `subPixelAlphaFloor`), rendering as a visible-but-thin hairline rather than
+  either a solid stroke or nothing, which is what keeps `StrokeAutoScale`'s thinned-down borders both
+  visible on a sparse map and from blacking out a dense one; the fade is continuous at width 1 so any
+  width ≥ 1 is byte-identical to before), `Ring` (orientation), `Scalars`/`JsonValue`
   (property type inference). Prefer extending these over taking a dependency.
 
 Format codec conventions: a writer must **not** close a caller-provided `Stream` (wrap with
@@ -125,15 +127,19 @@ equator-symmetric bounds and silently falls back to `PlateCarree` there). The CL
 `--projection auto|plate-carree|web-mercator|lambert` (with `equirectangular`, `mercator`, `lcc`, and
 `lambert-conformal-conic` as accepted aliases). `RenderOptions.StrokeAutoScale` (default **on**) makes
 stroke widths zoom-aware: a multiplier derived from the implicit zoom (`log2(canvas/bbox/256
-× 360)`) scales by √2 per zoom level (stroke halves for every two levels below, doubles for every two
-above) with country-scale (zoom 10) as the multiplier-of-1 anchor, clamped to [0.1, 6]. So the same
+× 360)`) scales by `2^(1/3)` per zoom level (stroke halves for every three levels below, doubles for
+every three above) with country-scale (zoom 10) as the multiplier-of-1 anchor, clamped to [0.25, 6].
+So the same
 scene rendered at a tighter bbox or larger canvas gets proportionally thicker borders, and a thumbnail
 or world view gets proportionally thinner ones — keeping strokes roughly proportional to output pixel
 density. This (with the rasterizer's sub-pixel coverage compensation, below) is what stops a
 low-resolution render of a dense map (thousands of tiny polygons) from collapsing to a solid black
-mass. Set `StrokeAutoScale = false` for a fixed pixel `StrokeWidth` regardless of scale. The √2 ramp
-is deliberately steeper than the tile-map ~1.15×/level convention because a *static* render of fixed
-data wants resolution-proportional strokes, not interactive-map persistence. Label size is
+mass. Set `StrokeAutoScale = false` for a fixed pixel `StrokeWidth` regardless of scale. The `2^(1/3)`
+ramp is deliberately steeper than the tile-map ~1.15×/level convention because a *static* render of
+fixed data wants resolution-proportional strokes, not interactive-map persistence; it was loosened
+from an earlier √2 (halve-every-two) ramp with a near-zero clamp, which thinned borders so hard that
+sparse zoomed-out maps lost their outlines — the gentler ramp, the higher 0.25 lower clamp and the
+rasterizer's coverage-fade floor together keep them visible. Label size is
 intentionally NOT scaled — text stays at fixed pixel sizes across zooms (web-map convention). PNG also supports
 optional feature labels: set
 `RenderOptions.Label` (or `LayerStyle.Label` per layer) to a `Func<Feature, string?>` and the

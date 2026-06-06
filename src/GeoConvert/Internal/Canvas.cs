@@ -2,8 +2,26 @@
 sealed class Canvas : IDisposable, IRenderSurface
 {
     // Reused across FillPolygon calls so a render with hundreds of polygons doesn't allocate a fresh
-    // crossings list per call.
-    readonly List<double> scanlineCrossings = [];
+    // set of crossings lists per call — one list per vertical sub-scanline (see fillSubSamples). The
+    // parallel path gets its own per-thread set instead, since rows run concurrently.
+    readonly List<double>[] scanlineCrossings = MakeCrossings();
+
+    static List<double>[] MakeCrossings()
+    {
+        var lists = new List<double>[fillSubSamples];
+        for (var i = 0; i < lists.Length; i++)
+        {
+            lists[i] = [];
+        }
+
+        return lists;
+    }
+
+    // Per-row fractional-coverage accumulator for the antialiased polygon fill (one double per pixel
+    // column). Rented once per Canvas and reused for every serial FillPolygon row — the parallel path
+    // gets its own per-thread buffer instead, since rows run concurrently. Only the [clearLo, clearHi]
+    // span actually touched by a polygon is cleared and read each row, so the stale tail is irrelevant.
+    readonly double[] coverageBuffer;
 
     // The logical pixel-buffer size (width × height × 4 bytes). May be smaller than Pixels.Length —
     // ArrayPool returns arrays at least the requested size, potentially larger — so anything reading
@@ -25,11 +43,16 @@ sealed class Canvas : IDisposable, IRenderSurface
         // Fill only the logical span — the rented array may be larger; the trailing bytes are
         // never read, so leaving stale pool content there is fine.
         MemoryMarshal.Cast<byte, uint>(Pixels.AsSpan(0, logicalSize)).Fill(Pack(background));
+        coverageBuffer = ArrayPool<double>.Shared.Rent(width);
     }
 
-    // Returns the pixel buffer to the pool. Owners must dispose so the array is recycled; the only
-    // owner today is MapRenderer.Render via `using var canvas = ...`.
-    public void Dispose() => ArrayPool<byte>.Shared.Return(Pixels);
+    // Returns the pooled buffers. Owners must dispose so the arrays are recycled; the only owner
+    // today is MapRenderer.Render via `using var canvas = ...`.
+    public void Dispose()
+    {
+        ArrayPool<byte>.Shared.Return(Pixels);
+        ArrayPool<double>.Shared.Return(coverageBuffer);
+    }
 
     // Packs RGBA into a uint so that reinterpreting the pixel buffer as uints yields the R,G,B,A byte order.
     static uint Pack(Rgba color) =>
@@ -168,16 +191,25 @@ sealed class Canvas : IDisposable, IRenderSurface
     /// band with its alpha scaled down by the requested width. A 0.4px line therefore reads as a
     /// faint hairline rather than a solid 1px stroke — which is what keeps a dense map (thousands
     /// of tiny polygons whose borders all collapse onto the same pixels at a small canvas size)
-    /// from filling in to a solid black mass. The scale is linear in width and continuous at
-    /// width = 1, so any width ≥ 1 is left exactly as before.
+    /// from filling in to a solid black mass. The fade is clamped so a hairline never drops below
+    /// <see cref="subPixelAlphaFloor"/> of its colour's alpha: without that floor, autoscaled borders
+    /// on a sparse zoomed-out map (a handful of countries, not thousands) fade almost to nothing —
+    /// the floor keeps them legibly visible while still letting the width itself shrink. The scale is
+    /// continuous at width = 1, so any width ≥ 1 is left exactly as before.
     /// </para>
     /// </summary>
+    // Lower bound on the sub-pixel coverage fade: a stroke thinner than 1px fades its alpha by its
+    // width, but never below this fraction. Tuned so a heavily-autoscaled border on a sparse map stays
+    // visible without a dense map's overlapping hairlines stacking back up into a solid mass.
+    const double subPixelAlphaFloor = 0.5;
+
     public void StrokeLine(double x0, double y0, double x1, double y1, double width, Rgba color)
     {
         // Coverage compensation for sub-pixel strokes (see remarks): below 1px the line can't get
         // geometrically thinner than the 0.5 radius floor, so fade its alpha by the width instead.
-        // Math.Min keeps width ≥ 1 at scale 1.0 — a no-op that leaves full-width output bit-identical.
-        var coverageScale = Math.Min(width, 1.0);
+        // Math.Min keeps width ≥ 1 at scale 1.0 — a no-op that leaves full-width output bit-identical;
+        // Math.Max floors the fade so a very thin stroke stays visible rather than vanishing.
+        var coverageScale = Math.Max(Math.Min(width, 1.0), subPixelAlphaFloor);
         color = color with {A = (byte)(color.A * coverageScale)};
         var radius = Math.Max(width / 2, 0.5);
         // One extra pixel beyond the geometric radius gives room for the fractional-coverage
@@ -402,15 +434,29 @@ sealed class Canvas : IDisposable, IRenderSurface
         }
     }
 
-    /// <summary>Fills the region bounded by the given rings using the even-odd rule (so holes are excluded).</summary>
+    /// <summary>
+    /// Fills the region bounded by the given rings using the even-odd rule (so holes are excluded),
+    /// antialiased. Each output row accumulates fractional coverage from
+    /// <see cref="fillSubSamples"/> evenly-spaced vertical sub-scanlines (vertical AA) with analytic
+    /// fractional coverage at the span endpoints (horizontal AA) into a per-row buffer, then composites
+    /// once. Fully-interior pixels accumulate to exactly coverage 1.0 (the sub-sample weights are exact
+    /// powers of two that sum to one), so a solid interior is byte-identical to a plain scanline fill
+    /// and reuses the opaque whole-pixel / translucent SIMD span paths; only edge pixels pay the
+    /// per-pixel coverage-scaled blend, which is what smooths the previously stair-stepped polygon
+    /// boundaries.
+    /// </summary>
     public void FillPolygon((double X, double Y)[][] rings, Rgba color)
     {
+        var minX = double.MaxValue;
+        var maxX = double.MinValue;
         var minY = double.MaxValue;
         var maxY = double.MinValue;
         foreach (var ring in rings)
         {
             foreach (var point in ring)
             {
+                minX = Math.Min(minX, point.X);
+                maxX = Math.Max(maxX, point.X);
                 minY = Math.Min(minY, point.Y);
                 maxY = Math.Max(maxY, point.Y);
             }
@@ -421,12 +467,24 @@ sealed class Canvas : IDisposable, IRenderSurface
             return;
         }
 
-        var first = Math.Max(0, (int)Math.Ceiling(minY));
+        // Floor (not ceil) so the edge rows/columns that a sub-pixel boundary only partially covers
+        // are visited — that's where the antialiased ramp lives. The composite span [clearLo, clearHi]
+        // bounds every pixel AddSpan can touch, so it's both the range cleared per row and the range
+        // scanned when compositing.
+        var clearLo = Math.Max(0, (int)Math.Floor(minX));
+        var clearHi = Math.Min(Width - 1, (int)Math.Floor(maxX));
+        if (clearHi < clearLo)
+        {
+            // Whole polygon lies off the left or right edge of the canvas — nothing to paint.
+            return;
+        }
+
+        var first = Math.Max(0, (int)Math.Floor(minY));
         var last = Math.Min(Height - 1, (int)Math.Floor(maxY));
         var opaque = color.A == 255;
         var packed = Pack(color);
-        // Precompute alpha factors once per polygon — the inner per-pixel loop avoids a division by 255
-        // on every pixel of a translucent fill.
+        // Precompute alpha factors once per polygon — the per-pixel/per-span blend avoids a division
+        // by 255 on every pixel of a translucent fill.
         var a = color.A / 255d;
         var inverse = 1 - a;
         var preR = color.R * a;
@@ -439,18 +497,18 @@ sealed class Canvas : IDisposable, IRenderSurface
         // are still serialised by the caller — order matters for source-over). The threshold
         // gates out small polygons where Parallel.For's per-iter overhead dominates the row work;
         // measured tipping point on a modern x86 is ~64 rows. Below threshold the serial path
-        // reuses the class-level crossings list (no allocation per render); above it each thread
-        // gets a fresh list via the localInit factory.
+        // reuses the class-level crossings list and coverage buffer (no allocation per render);
+        // above it each thread gets its own pair via the localInit factory.
         if (last - first + 1 >= parallelScanlineThreshold)
         {
             Parallel.For(
                 first,
                 last + 1,
-                () => new List<double>(),
-                (y, _, crossings) =>
+                () => (Crossings: MakeCrossings(), Coverage: new double[Width]),
+                (y, _, scratch) =>
                 {
-                    FillScanline(y, crossings, rings, opaque, packed, preR, preG, preB, preA, inverse);
-                    return crossings;
+                    FillScanline(y, scratch.Crossings, scratch.Coverage, rings, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
+                    return scratch;
                 },
                 _ => { });
         }
@@ -458,7 +516,7 @@ sealed class Canvas : IDisposable, IRenderSurface
         {
             for (var y = first; y <= last; y++)
             {
-                FillScanline(y, scanlineCrossings, rings, opaque, packed, preR, preG, preB, preA, inverse);
+                FillScanline(y, scanlineCrossings, coverageBuffer, rings, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
             }
         }
     }
@@ -467,57 +525,150 @@ sealed class Canvas : IDisposable, IRenderSurface
     // 8-core x86. Tune downward if profile shows under-utilisation at this threshold.
     const int parallelScanlineThreshold = 64;
 
-    // Fills one scanline of a polygon: walks every ring's edges to find x-crossings at y+0.5,
-    // sorts them, then fills the pixel runs between paired crossings under the even-odd rule.
-    // Factored out of FillPolygon so the serial and parallel paths share one body — `crossings`
-    // is the caller's reusable list (class-level for serial, per-thread for parallel).
-    void FillScanline(int y, List<double> crossings, (double X, double Y)[][] rings, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse)
+    // Vertical sub-scanlines per output row. Four gives four levels of vertical antialiasing on
+    // near-horizontal edges and (combined with the analytic horizontal coverage) smooth diagonals,
+    // while keeping the per-row edge walk to 4×. The weight 1/4 is exact in IEEE-754, so a fully
+    // covered pixel sums to exactly 1.0 and stays on the fast composite path.
+    const int fillSubSamples = 4;
+
+    // Accumulates one antialiased scanline: walks every ring's edges once, and for each edge records
+    // its x-crossing into the list for every sub-scanline of this row that the edge straddles (so the
+    // edge arrays are traversed once per row, not once per sub-scanline). Each sub-scanline's crossings
+    // are then sorted and turned into fractional coverage for the runs between paired crossings
+    // (even-odd rule) accumulated into `coverage`; finally the row's coverage is composited into the
+    // pixel buffer. `crossings` (one list per sub-scanline) and `coverage` are the caller's reusable
+    // scratch (class-level for serial, per-thread for parallel). Only the [clearLo, clearHi] column
+    // span — the polygon's pixel x-extent — is cleared and composited.
+    void FillScanline(int y, List<double>[] crossings, double[] coverage, (double X, double Y)[][] rings, Rgba color, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse, int clearLo, int clearHi)
     {
-        var scan = y + 0.5;
-        crossings.Clear();
+        coverage.AsSpan(clearLo, clearHi - clearLo + 1).Clear();
+
+        foreach (var list in crossings)
+        {
+            list.Clear();
+        }
+
         foreach (var ring in rings)
         {
             for (var i = 0; i < ring.Length; i++)
             {
                 var pa = ring[i];
                 var pb = ring[i + 1 == ring.Length ? 0 : i + 1];
-                if ((!(pa.Y <= scan) || !(pb.Y > scan)) &&
-                    (!(pb.Y <= scan) || !(pa.Y > scan)))
+                for (var sub = 0; sub < fillSubSamples; sub++)
                 {
-                    continue;
-                }
+                    var scan = y + (sub + 0.5) / fillSubSamples;
+                    if ((!(pa.Y <= scan) || !(pb.Y > scan)) &&
+                        (!(pb.Y <= scan) || !(pa.Y > scan)))
+                    {
+                        continue;
+                    }
 
-                var t = (scan - pa.Y) / (pb.Y - pa.Y);
-                crossings.Add(pa.X + t * (pb.X - pa.X));
+                    var t = (scan - pa.Y) / (pb.Y - pa.Y);
+                    crossings[sub].Add(pa.X + t * (pb.X - pa.X));
+                }
             }
         }
 
-        crossings.Sort();
-        for (var i = 0; i + 1 < crossings.Count; i += 2)
+        const double weight = 1.0 / fillSubSamples;
+        foreach (var list in crossings)
         {
-            var startX = Math.Max((int)Math.Ceiling(crossings[i] - 0.5), 0);
-            var endX = Math.Min((int)Math.Floor(crossings[i + 1] - 0.5), Width - 1);
-            if (startX > endX)
+            list.Sort();
+            for (var i = 0; i + 1 < list.Count; i += 2)
             {
+                AddSpan(coverage, list[i], list[i + 1], weight);
+            }
+        }
+
+        CompositeRow(y, coverage, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
+    }
+
+    // Adds `weight` of horizontal coverage for the float span [xLeft, xRight) into the row buffer,
+    // splitting the fractional coverage of the two boundary pixels analytically (a pixel the span only
+    // partly covers gets the covered fraction) and full weight to the pixels wholly inside. The span is
+    // clipped to [0, Width] first so off-canvas runs contribute nothing.
+    void AddSpan(double[] coverage, double xLeft, double xRight, double weight)
+    {
+        if (xLeft < 0)
+        {
+            xLeft = 0;
+        }
+
+        if (xRight > Width)
+        {
+            xRight = Width;
+        }
+
+        if (xLeft >= xRight)
+        {
+            return;
+        }
+
+        var left = (int)xLeft;
+        var right = (int)xRight;
+        if (left == right)
+        {
+            // Span narrower than a pixel and contained in one column (e.g. a polygon's pointed tip).
+            coverage[left] += weight * (xRight - xLeft);
+            return;
+        }
+
+        coverage[left] += weight * (left + 1 - xLeft);
+        for (var x = left + 1; x < right; x++)
+        {
+            coverage[x] += weight;
+        }
+
+        if (right < Width)
+        {
+            coverage[right] += weight * (xRight - right);
+        }
+    }
+
+    // Composites one row of accumulated coverage into the pixel buffer. Walks [clearLo, clearHi],
+    // skipping empty columns, fast-pathing runs of fully-covered (coverage ≥ 1) pixels through the
+    // opaque whole-pixel fill or the translucent SIMD span blend, and blending partially-covered edge
+    // pixels individually with their alpha scaled by coverage.
+    void CompositeRow(int y, double[] coverage, Rgba color, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse, int clearLo, int clearHi)
+    {
+        var x = clearLo;
+        while (x <= clearHi)
+        {
+            var c = coverage[x];
+            if (c <= 0)
+            {
+                x++;
                 continue;
             }
 
-            if (opaque)
+            if (c >= 1)
             {
-                // An opaque fill overwrites the span, so write whole pixels directly.
-                var span = Pixels.AsSpan((y * Width + startX) * 4, (endX - startX + 1) * 4);
-                MemoryMarshal.Cast<byte, uint>(span).Fill(packed);
+                var runStart = x;
+                do
+                {
+                    x++;
+                }
+                while (x <= clearHi && coverage[x] >= 1);
+
+                if (opaque)
+                {
+                    // A fully-covered opaque run overwrites the span, so write whole pixels directly.
+                    var span = Pixels.AsSpan((y * Width + runStart) * 4, (x - runStart) * 4);
+                    MemoryMarshal.Cast<byte, uint>(span).Fill(packed);
+                }
+                else
+                {
+                    // Fully-covered translucent run — blend the whole span at once. The per-pixel math
+                    // is identical to BlendTranslucent's bit-for-bit so snapshot output matches scalar.
+                    var rowStart = (y * Width + runStart) * 4;
+                    var rowEnd = (y * Width + x) * 4;
+                    BlendTranslucentSpan(rowStart, rowEnd, preR, preG, preB, preA, inverse);
+                }
             }
             else
             {
-                // Spans are already clipped to [0, Width) by startX/endX, so blend directly into
-                // the pixel buffer instead of re-bounds-checking each pixel in Blend. Routes
-                // through BlendTranslucentSpan so a long translucent run vectorises across
-                // pixels; the per-pixel math is identical to BlendTranslucent's bit-for-bit so
-                // snapshot output matches the scalar path.
-                var rowStart = (y * Width + startX) * 4;
-                var rowEnd = (y * Width + endX + 1) * 4;
-                BlendTranslucentSpan(rowStart, rowEnd, preR, preG, preB, preA, inverse);
+                // Partially-covered edge pixel: fade the fill alpha by the coverage fraction.
+                Blend(x, y, color with {A = (byte)(color.A * c)});
+                x++;
             }
         }
     }

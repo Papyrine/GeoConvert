@@ -5,8 +5,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="ProjectDefaults" Version="1.0.174" />
-    <PackageVersion Include="SponsorCheck" Version="0.9.0" GitHubSponsorsAccount="Papyrine" SponsorOwner="Papyrine" CheckTransitiveReferences="true" SponsorLandingUrl="https://github.com/sponsors/Papyrine" />
-    <PackageVersion Include="Polyfill" Version="10.8.0" />
+    <PackageVersion Include="SponsorCheck" Version="0.10.0" GitHubSponsorsAccount="Papyrine" SponsorOwner="Papyrine" CheckTransitiveReferences="true" SponsorLandingUrl="https://github.com/sponsors/Papyrine" />
+    <PackageVersion Include="Polyfill" Version="10.8.1" />
     <PackageVersion Include="System.IO.Hashing" Version="10.0.8" />
     <PackageVersion Include="SkiaSharp" Version="3.119.4" />
     <PackageVersion Include="SixLabors.ImageSharp" Version="4.0.0" />
@@ -19,8 +19,8 @@
     <PackageVersion Include="Verify.DiffPlex" Version="3.2.0" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
     <PackageVersion Include="Parquet.Net" Version="6.0.3" />
-    <PackageVersion Include="MapBundle" Version="0.3.3" />
-    <PackageVersion Include="MapBundle.World" Version="0.3.3" />
+    <PackageVersion Include="MapBundle" Version="1.0.0" />
+    <PackageVersion Include="MapBundle.World" Version="1.0.0" />
     <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.8" />
     <PackageVersion Include="bunit" Version="2.7.2" />
     <PackageVersion Include="Verify.Bunit" Version="13.0.3" />

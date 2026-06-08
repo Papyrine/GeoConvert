@@ -333,13 +333,62 @@ public class LabelTests
     }
 
     [Test]
-    public async Task Labeller_skips_off_canvas_anchor()
+    public async Task Labeller_drops_area_label_too_large_to_fit()
     {
-        // Anchor in the corner so the text bounding box would extend past the left/top edges.
-        // Off-canvas labels are dropped silently rather than rendered cropped.
+        // Anchor on-canvas (so the area-label nudge is in play) but the word is wider than the whole
+        // 64px canvas — nudging can't make it fit, so it is still dropped rather than rendered cropped.
+        // The verified image is therefore the bare background.
         var canvas = new Canvas(64, 32, Rgba.White);
         var labeller = new Labeller(canvas);
         await Assert.That(labeller.TryPlace("OFFSCREEN", 1, 1, 14, Rgba.Black, halo: null)).IsFalse();
+        await Assert.That(labeller.PlacedCount).IsEqualTo(0);
+        await Verify(Encode(canvas), "png");
+    }
+
+    [Test]
+    public async Task Labeller_nudges_area_label_in_from_top_left()
+    {
+        // A small area label anchored in the top-left corner overhangs the left and top edges. It is
+        // nudged fully into view (not dropped) and placed — the snapshot shows it sitting against the
+        // top-left corner rather than clipped.
+        var canvas = new Canvas(200, 64, Rgba.White);
+        var labeller = new Labeller(canvas);
+        await Assert.That(labeller.TryPlace("HI", 2, 2, 14, Rgba.Black, halo: null)).IsTrue();
+        await Assert.That(labeller.PlacedCount).IsEqualTo(1);
+        await Verify(Encode(canvas), "png");
+    }
+
+    [Test]
+    public async Task Labeller_nudges_area_label_in_from_bottom_right()
+    {
+        // The same nudge from the opposite corner — exercises the right/bottom overhang shifts.
+        var canvas = new Canvas(200, 64, Rgba.White);
+        var labeller = new Labeller(canvas);
+        await Assert.That(labeller.TryPlace("HI", 199, 63, 14, Rgba.Black, halo: null)).IsTrue();
+        await Assert.That(labeller.PlacedCount).IsEqualTo(1);
+        await Verify(Encode(canvas), "png");
+    }
+
+    [Test]
+    public async Task Labeller_drops_area_label_with_off_canvas_anchor()
+    {
+        // When the anchor itself is off-canvas the feature's interior isn't in view, so the nudge is
+        // not applied and the label drops — no stray name pinned to the edge for an off-screen feature.
+        // The verified image is the bare background.
+        var canvas = new Canvas(200, 64, Rgba.White);
+        var labeller = new Labeller(canvas);
+        await Assert.That(labeller.TryPlace("HI", -20, 32, 14, Rgba.Black, halo: null)).IsFalse();
+        await Assert.That(labeller.PlacedCount).IsEqualTo(0);
+        await Verify(Encode(canvas), "png");
+    }
+
+    // Encodes a painted Canvas to PNG bytes so a Labeller test can Verify the rendered result the
+    // same way the RenderPng snapshots do.
+    static byte[] Encode(Canvas canvas)
+    {
+        using var stream = new MemoryStream();
+        Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, CompressionLevel.Optimal);
+        return stream.ToArray();
     }
 
     [Test]

@@ -7,7 +7,10 @@
 /// upper-left, the two lower corners, the cardinals, the bottom slot last — that Eduard Imhof
 /// (1962/1975) and Pinhas Yoeli (1972) tabulated as the preference order for cartographic point
 /// labels. First candidate that clears the canvas edge and every previously-placed bbox wins;
-/// otherwise the label is dropped. Christensen/Marks/Shieber (1995) proved general point-label
+/// otherwise the label is dropped. A centred area label is the one exception to "clip the edge →
+/// drop": it is first nudged back inside the canvas (a corner feature keeps its name on a narrow
+/// render instead of vanishing), and only dropped if it is too large to fit at all.
+/// Christensen/Marks/Shieber (1995) proved general point-label
 /// placement NP-hard, so a real engine bolts simulated annealing and weighted scoring on top of
 /// this ring; here the ring alone is enough to keep dots and labels visually distinct on a
 /// typical map without bloating the renderer.
@@ -76,7 +79,17 @@ sealed class Labeller
         // would visually push caps upward by the descender depth.
         var centredLeftX = anchorX - width / 2;
         var centredBaselineY = anchorY + size / 2;
-        return TryPlaceAt(text, centredLeftX, centredBaselineY, width, size, color, halo, knockout);
+        // Area labels (centroid / midpoint anchors) nudge back into view when the box overhangs an
+        // edge, rather than dropping like a point label does — a feature whose anchor sits in a
+        // corner (a lake tucked against the border) keeps its name on a narrow canvas instead of
+        // losing it. The nudge is gated on the anchor itself being on-canvas: a feature whose
+        // interior (centroid / midpoint) is off-screen — e.g. a country mostly outside the render
+        // bounds — is genuinely not in view, so it still drops rather than pinning a stray name to
+        // the edge. A box too large to fit the canvas in either axis is likewise dropped by the
+        // off-canvas check below.
+        var anchorOnCanvas = anchorX >= 0 && anchorX <= surface.Width &&
+            anchorY >= 0 && anchorY <= surface.Height;
+        return TryPlaceAt(text, centredLeftX, centredBaselineY, width, size, color, halo, knockout, nudgeIntoView: anchorOnCanvas);
     }
 
     static IEnumerable<(double LeftX, double BaselineY)> PointCandidates(double anchorX, double anchorY, double width, double size, double offset)
@@ -104,7 +117,7 @@ sealed class Labeller
         yield return (anchorX - width / 2, anchorY + offset + size);
     }
 
-    bool TryPlaceAt(string text, double leftX, double baselineY, double width, double size, Rgba color, Rgba? halo, Rgba? knockout)
+    bool TryPlaceAt(string text, double leftX, double baselineY, double width, double size, Rgba color, Rgba? halo, Rgba? knockout, bool nudgeIntoView = false)
     {
         var unit = size / StrokeFont.CapHeight;
         var capTopY = baselineY - size;
@@ -131,6 +144,24 @@ sealed class Labeller
         var by0 = inkTopY - pad;
         var bx1 = leftX + width + pad;
         var by1 = inkBottomY + pad;
+
+        if (nudgeIntoView)
+        {
+            // Shift a centred area label back inside the canvas when it overhangs an edge, then let
+            // the off-canvas check below confirm it now fits. Only one side per axis can overhang a
+            // centred label, so a single shift per axis suffices; if the box is wider/taller than
+            // the canvas the shift can't close the gap and the check still drops it. The shift moves
+            // both the draw origin (leftX / baselineY) and the collision box together so text,
+            // knockout rect and collision all stay aligned.
+            var shiftX = bx0 < 0 ? -bx0 : bx1 > surface.Width ? surface.Width - bx1 : 0;
+            var shiftY = by0 < 0 ? -by0 : by1 > surface.Height ? surface.Height - by1 : 0;
+            leftX += shiftX;
+            baselineY += shiftY;
+            bx0 += shiftX;
+            bx1 += shiftX;
+            by0 += shiftY;
+            by1 += shiftY;
+        }
 
         // Off-canvas rejection. Any part of the (haloed) bbox sitting outside [0, W) × [0, H)
         // means part of the label would clip — drop it entirely rather than render a cropped word

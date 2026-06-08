@@ -20,9 +20,9 @@ public class RenderPhaseBenchmarks
     public void Setup()
     {
         data = SampleData.Polygons(500);
-        optimal = new() { Width = Width, Height = Height, Compression = CompressionLevel.Optimal };
-        fastest = new() { Width = Width, Height = Height, Compression = CompressionLevel.Fastest };
-        noCompression = new() { Width = Width, Height = Height, Compression = CompressionLevel.NoCompression };
+        optimal = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.Optimal } };
+        fastest = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.Fastest } };
+        noCompression = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.NoCompression } };
 
         // Pre-rasterise once by reaching into the renderer's private Projection + DrawLayer so we
         // can grab the raw Canvas.Pixels buffer. Used by the EncodeOnly_* benchmarks to time the
@@ -101,7 +101,7 @@ public class RenderBigPolygonBenchmarks
     public void Setup()
     {
         data = SampleData.BigPolygons(10);
-        options = new() { Width = 1024, Height = 768, Compression = CompressionLevel.NoCompression };
+        options = new() { Width = 1024, Height = 768, Png = new() { Compression = CompressionLevel.NoCompression } };
     }
 
     // NoCompression strips deflate variability so the rasterizer's share is visible per-iter.
@@ -123,7 +123,7 @@ public class RenderLineBenchmarks
     public void Setup()
     {
         data = SampleData.LongLines(50);
-        options = new() { Width = 1024, Height = 768, Compression = CompressionLevel.NoCompression };
+        options = new() { Width = 1024, Height = 768, Png = new() { Compression = CompressionLevel.NoCompression } };
     }
 
     [Benchmark]

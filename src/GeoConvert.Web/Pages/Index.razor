@@ -75,7 +75,7 @@
             <div class="image-options">
                 <div class="format-selector">
                     <label for="projection-select">Map projection</label>
-                    <select id="projection-select" class="format-select" value="@projection" @onchange="OnProjectionChanged">
+                    <select id="projection-select" class="format-select" @bind="settings.Projection" @bind:after="RefreshPreviewAsync">
                         @foreach (var option in Projections)
                         {
                             <option value="@option.Value">@option.Label</option>
@@ -83,8 +83,8 @@
                     </select>
                 </div>
                 <div class="format-selector">
-                    <label for="max-dimension">Max dimension</label>
-                    <select id="max-dimension" class="format-select" value="@maxDimension" @onchange="OnMaxDimensionChanged">
+                    <label for="max-dimension">Resolution</label>
+                    <select id="max-dimension" class="format-select" @bind="settings.MaxDimension" @bind:after="RefreshPreviewAsync">
                         @foreach (var option in Dimensions)
                         {
                             <option value="@option.Value">@option.Label</option>
@@ -93,9 +93,100 @@
                 </div>
                 <div class="format-selector label-toggle">
                     <label for="show-labels">Labels</label>
-                    <input id="show-labels" type="checkbox" checked="@showLabels" @onchange="OnShowLabelsChanged" />
+                    <input id="show-labels" type="checkbox" @bind="settings.Labels" @bind:after="RefreshPreviewAsync" />
                 </div>
             </div>
+
+            @* All remaining RenderOptions knobs, tucked behind a native <details> so the default UI stays
+               simple. Visual knobs refresh the preview (@bind:after); the format-specific ones at the
+               bottom (PNG compression, SVG simplify) don't change the PNG preview, so they apply only at
+               download and skip the refresh. *@
+            <details class="advanced-options">
+                <summary>Advanced options</summary>
+                <div class="advanced-grid">
+                    <section class="advanced-section">
+                        <h4>Size &amp; layout</h4>
+                        <div class="option-row">
+                            <label for="padding">Padding (px)</label>
+                            <input id="padding" type="number" min="0" max="200" @bind="settings.Padding" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                    </section>
+
+                    <section class="advanced-section">
+                        <h4>Strokes &amp; features</h4>
+                        <div class="option-row">
+                            <label for="stroke-width">Stroke width (px)</label>
+                            <input id="stroke-width" type="number" min="0" max="50" @bind="settings.StrokeWidth" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row">
+                            <label for="point-radius">Point radius (px)</label>
+                            <input id="point-radius" type="number" min="0" max="50" @bind="settings.PointRadius" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="stroke-autoscale">Auto-scale strokes to zoom</label>
+                            <input id="stroke-autoscale" type="checkbox" @bind="settings.StrokeAutoScale" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row">
+                            <label for="min-feature">Min feature size (px)</label>
+                            <input id="min-feature" type="number" min="0" max="64" step="0.5" @bind="settings.MinFeaturePixels" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row">
+                            <label for="label-size">Label size (px)</label>
+                            <input id="label-size" type="number" min="1" max="200" step="0.5" @bind="settings.LabelSize" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                    </section>
+
+                    <section class="advanced-section">
+                        <h4>Colors</h4>
+                        <div class="option-row option-row-inline">
+                            <label for="background-color">Background</label>
+                            <input id="background-color" type="color" @bind="settings.BackgroundHex" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="ocean-enabled">Ocean fill</label>
+                            <input id="ocean-enabled" type="checkbox" @bind="settings.OceanEnabled" @bind:after="RefreshPreviewAsync" />
+                            <input type="color" @bind="settings.OceanHex" @bind:after="RefreshPreviewAsync" disabled="@(!settings.OceanEnabled)" />
+                            <input type="range" min="0" max="255" @bind="settings.OceanOpacity" @bind:after="RefreshPreviewAsync" disabled="@(!settings.OceanEnabled)" title="Opacity" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="stroke-color">Stroke</label>
+                            <input id="stroke-color" type="color" @bind="settings.StrokeHex" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="fill-color">Polygon fill</label>
+                            <input id="fill-color" type="color" @bind="settings.FillHex" @bind:after="RefreshPreviewAsync" />
+                            <input type="range" min="0" max="255" @bind="settings.FillOpacity" @bind:after="RefreshPreviewAsync" title="Opacity" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="label-color">Label text</label>
+                            <input id="label-color" type="color" @bind="settings.LabelColorHex" @bind:after="RefreshPreviewAsync" />
+                        </div>
+                        <div class="option-row option-row-inline">
+                            <label for="halo-enabled">Label halo</label>
+                            <input id="halo-enabled" type="checkbox" @bind="settings.HaloEnabled" @bind:after="RefreshPreviewAsync" />
+                            <input type="color" @bind="settings.LabelHaloHex" @bind:after="RefreshPreviewAsync" disabled="@(!settings.HaloEnabled)" />
+                            <input type="range" min="0" max="255" @bind="settings.LabelHaloOpacity" @bind:after="RefreshPreviewAsync" disabled="@(!settings.HaloEnabled)" title="Opacity" />
+                        </div>
+                    </section>
+
+                    <section class="advanced-section">
+                        <h4>Format-specific</h4>
+                        <div class="option-row">
+                            <label for="png-compression">PNG compression</label>
+                            <select id="png-compression" class="format-select" @bind="settings.PngCompression">
+                                @foreach (var option in CompressionLevels)
+                                {
+                                    <option value="@option.Value">@option.Label</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="option-row">
+                            <label for="svg-simplify">SVG simplify (px)</label>
+                            <input id="svg-simplify" type="number" min="0" max="20" step="0.1" @bind="settings.SvgSimplifyTolerance" />
+                        </div>
+                    </section>
+                </div>
+            </details>
         }
 
         <div class="convert-panel">

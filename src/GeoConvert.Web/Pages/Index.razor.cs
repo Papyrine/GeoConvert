@@ -1,3 +1,5 @@
+using System.IO.Compression;
+
 namespace GeoConvert.Web.Pages;
 
 public partial class Index
@@ -22,6 +24,14 @@ public partial class Index
         (8192, "8192 px"),
     ];
 
+    public static readonly (CompressionLevel Value, string Label)[] CompressionLevels =
+    [
+        (CompressionLevel.Optimal, "Optimal"),
+        (CompressionLevel.SmallestSize, "Smallest size"),
+        (CompressionLevel.Fastest, "Fastest"),
+        (CompressionLevel.NoCompression, "None"),
+    ];
+
     string? sourceName;
     FormatInfo? sourceFormat;
     FeatureCollection? features;
@@ -31,9 +41,7 @@ public partial class Index
     string? issueUrl;
     string? userAgent;
     GeoFormat target = GeoFormat.Kml;
-    MapProjection projection = MapProjection.Auto;
-    int maxDimension = 2048;
-    bool showLabels;
+    readonly RenderSettings settings = new();
     bool isBusy;
     bool isRendering;
     ConvertProgress? progressReport;
@@ -220,7 +228,7 @@ public partial class Index
     {
         try
         {
-            var png = ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress);
+            var png = ConversionService.RenderPng(collection, settings, progress);
             return $"data:image/png;base64,{Convert.ToBase64String(png)}";
         }
         catch
@@ -234,28 +242,6 @@ public partial class Index
     {
         target = format;
         return Task.CompletedTask;
-    }
-
-    Task OnProjectionChanged(ChangeEventArgs args)
-    {
-        projection = Enum.Parse<MapProjection>((string) args.Value!);
-        return RefreshPreviewAsync();
-    }
-
-    Task OnMaxDimensionChanged(ChangeEventArgs args)
-    {
-        if (int.TryParse((string?) args.Value, out var value) && value > 0)
-        {
-            maxDimension = value;
-        }
-
-        return RefreshPreviewAsync();
-    }
-
-    Task OnShowLabelsChanged(ChangeEventArgs args)
-    {
-        showLabels = args.Value is true;
-        return RefreshPreviewAsync();
     }
 
     async Task Download()
@@ -279,8 +265,8 @@ public partial class Index
             var format = info.Format;
             var bytes = await Task.Run(() => format switch
             {
-                GeoFormat.Png => ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress),
-                GeoFormat.Svg => ConversionService.RenderSvg(collection, projection, maxDimension, showLabels, progress),
+                GeoFormat.Png => ConversionService.RenderPng(collection, settings, progress),
+                GeoFormat.Svg => ConversionService.RenderSvg(collection, settings, progress),
                 _ => ConversionService.Write(collection, format, progress),
             });
             var baseName = Path.GetFileNameWithoutExtension(sourceName) ?? "map";

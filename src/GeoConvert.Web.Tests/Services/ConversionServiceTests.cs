@@ -90,7 +90,7 @@ public class ConversionServiceTests
     {
         var features = ConversionService.Read(Sample.GeoJsonBytes, GeoFormat.GeoJson);
 
-        var png = ConversionService.RenderPng(features, MapProjection.PlateCarree, 256);
+        var png = ConversionService.RenderPng(features, new() { Projection = MapProjection.PlateCarree, MaxDimension = 256 });
 
         // PNG IHDR width/height are big-endian 32-bit ints at byte offsets 16 and 20.
         var width = (png[16] << 24) | (png[17] << 16) | (png[18] << 8) | png[19];
@@ -103,7 +103,7 @@ public class ConversionServiceTests
     {
         var features = ConversionService.Read(Sample.GeoJsonBytes, GeoFormat.GeoJson);
 
-        var png = ConversionService.RenderPng(features, MapProjection.Auto, 0);
+        var png = ConversionService.RenderPng(features, new() { Projection = MapProjection.Auto, MaxDimension = 0 });
 
         var width = (png[16] << 24) | (png[17] << 16) | (png[18] << 8) | png[19];
         await Assert.That(width).IsEqualTo(2048);
@@ -145,7 +145,7 @@ public class ConversionServiceTests
             }
         }
 
-        var filtered = ConversionService.RenderPng(subPixel, MapProjection.PlateCarree, 256);
+        var filtered = ConversionService.RenderPng(subPixel, new() { Projection = MapProjection.PlateCarree, MaxDimension = 256 });
         var unfiltered = MapRenderer.RenderPng(
             subPixel,
             new()
@@ -201,7 +201,7 @@ public class ConversionServiceTests
     {
         var features = ConversionService.Read(Sample.GeoJsonBytes, GeoFormat.GeoJson);
         var recorder = new Recorder();
-        ConversionService.RenderPng(features, MapProjection.Auto, 256, true, recorder);
+        ConversionService.RenderPng(features, new() { Projection = MapProjection.Auto, MaxDimension = 256, Labels = true }, recorder);
 
         await Assert.That(recorder.Reports[^1].FeatureTotal).IsEqualTo(2L);
     }

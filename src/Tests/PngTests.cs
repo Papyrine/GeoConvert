@@ -1015,7 +1015,7 @@ public class PngTests
         {
             Width = 512,
             Height = 512,
-            Compression = level,
+            Png = new() { Compression = level },
         };
 
         var none = MapRenderer.RenderPng(features, Build(CompressionLevel.NoCompression));

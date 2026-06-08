@@ -13,7 +13,7 @@ if (args.Length > 0 && args[0] == "--sizes")
     {
         foreach (var level in new[] { CompressionLevel.Optimal, CompressionLevel.Fastest, CompressionLevel.NoCompression })
         {
-            var bytes = MapRenderer.RenderPng(data, new() { Width = 1024, Height = 768, Compression = level });
+            var bytes = MapRenderer.RenderPng(data, new() { Width = 1024, Height = 768, Png = new() { Compression = level } });
             Console.WriteLine($"{name,-15} {level,-15} {bytes.Length,10} bytes");
         }
     }

@@ -431,7 +431,7 @@ public class SvgTests
                 Width = 200,
                 Height = 120,
                 Projection = MapProjection.PlateCarree,
-                SvgSimplifyTolerance = tolerance,
+                Svg = new() { SimplifyTolerance = tolerance },
             };
 
         var full = MapRenderer.RenderSvg(features, Options(0));

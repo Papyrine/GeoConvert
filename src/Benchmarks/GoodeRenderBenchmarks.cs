@@ -48,7 +48,7 @@ public class GoodeRenderBenchmarks
             // Goode path can't shortcut by clipping the data away.
             Bounds = new(-180, -90, 180, 90),
             // Strip deflate so the measured time is rasterisation + projection prep, not encoding.
-            Compression = CompressionLevel.NoCompression,
+            Png = new() { Compression = CompressionLevel.NoCompression },
         };
 
     // Non-interrupted baseline for the polygon workload — no lobe clipping happens.

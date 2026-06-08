@@ -247,7 +247,7 @@ MapRenderer.RenderSvg(features, "europe.svg", options);
 <sup><a href='/src/Tests/Snippets.cs#L175-L196' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToSvg' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
-The same `RenderOptions` knobs apply (`RenderOptions.Compression` is the one exception — it is PNG-only). Because labels are emitted as native `<text>`, their glyph shapes depend on the fonts available to the viewer; placement and collision are identical to the PNG renderer (which reserves boxes from the hand-rolled stroke font's metrics). From the command line, output a `.svg` and pass `--bbox`/`--size` exactly as for PNG:
+The same `RenderOptions` knobs apply (the format-specific `RenderOptions.Png` and `RenderOptions.Svg` sub-options are the exception — `Png` is ignored for SVG output and `Svg` for PNG). Because labels are emitted as native `<text>`, their glyph shapes depend on the fonts available to the viewer; placement and collision are identical to the PNG renderer (which reserves boxes from the hand-rolled stroke font's metrics). From the command line, output a `.svg` and pass `--bbox`/`--size` exactly as for PNG:
 
 ```
 geoconvert world.geojson europe.svg --bbox -10,35,30,60 --size 1200x900
@@ -255,7 +255,7 @@ geoconvert world.geojson europe.svg --bbox -10,35,30,60 --size 1200x900
 
 ### Shrinking SVG output
 
-A world-scale SVG emits every projected vertex, and detailed data (coastlines, country borders) carries far more vertices than a fixed render size can resolve — enough to push a whole-world export past 100 MB. `RenderOptions.SvgSimplifyTolerance` (SVG-only; ignored for the raster PNG) thins those vertices with Douglas–Peucker **in canvas pixel space** as the markup is written, so the tolerance is measured in output pixels rather than degrees. A sub-pixel value is therefore visually lossless at the rendered size while collapsing the redundant detail, and endpoints are always kept so closed rings stay closed. It defaults to `0` (off — every vertex is emitted).
+A world-scale SVG emits every projected vertex, and detailed data (coastlines, country borders) carries far more vertices than a fixed render size can resolve — enough to push a whole-world export past 100 MB. `RenderOptions.Svg.SimplifyTolerance` (SVG-only; ignored for the raster PNG) thins those vertices with Douglas–Peucker **in canvas pixel space** as the markup is written, so the tolerance is measured in output pixels rather than degrees. A sub-pixel value is therefore visually lossless at the rendered size while collapsing the redundant detail, and endpoints are always kept so closed rings stay closed. It defaults to `0` (off — every vertex is emitted).
 
 <!-- snippet: RenderSvgSimplify -->
 <a id='snippet-RenderSvgSimplify'></a>
@@ -266,8 +266,8 @@ var options = new RenderOptions
     Width = 1024,
     // Half a pixel: invisible at this render size, but collapses the dense sub-pixel
     // detail that otherwise bloats the file. A world borders layer drops from ~109 MB
-    // to ~16 MB. The matching PNG render is unaffected (SvgSimplifyTolerance is SVG-only).
-    SvgSimplifyTolerance = 0.5,
+    // to ~16 MB. The matching PNG render is unaffected (Svg options are SVG-only).
+    Svg = new() { SimplifyTolerance = 0.5 },
 };
 
 MapRenderer.RenderSvg(features, "world.svg", options);
@@ -620,7 +620,7 @@ Three formats compress their output and let the caller pick the speed/ratio trad
 
 | Format | Knob | Default |
 | --- | --- | --- |
-| PNG | `RenderOptions.Compression` (deflate level for the `IDAT` chunk) | `CompressionLevel.Optimal` |
+| PNG | `RenderOptions.Png.Compression` (deflate level for the `IDAT` chunk) | `CompressionLevel.Optimal` |
 | KMZ | `Kmz.Write(..., CompressionLevel)` (the `doc.kml` zip entry) | `CompressionLevel.Optimal` |
 | GeoParquet | `GeoParquet.Write(..., ParquetCompression, CompressionLevel)` (codec, plus gzip level when the codec is `Gzip`) | `ParquetCompression.Snappy` |
 
@@ -629,7 +629,7 @@ Three formats compress their output and let the caller pick the speed/ratio trad
 <!-- snippet: Compression -->
 <a id='snippet-Compression'></a>
 ```cs
-// PNG: the deflate level for the IDAT chunk is exposed on RenderOptions.
+// PNG: the deflate level for the IDAT chunk is exposed on RenderOptions.Png.
 MapRenderer.RenderPng(
     features,
     "world.png",
@@ -637,7 +637,7 @@ MapRenderer.RenderPng(
     {
         Bounds = MapRenderer.WebMercatorWorldBounds,
         Projection = MapProjection.WebMercator,
-        Compression = CompressionLevel.Fastest,
+        Png = new() { Compression = CompressionLevel.Fastest },
     });
 
 // KMZ: the doc.kml zip entry's compression level is an optional Write argument.

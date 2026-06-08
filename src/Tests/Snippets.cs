@@ -210,8 +210,8 @@ static class Snippets
             Width = 1024,
             // Half a pixel: invisible at this render size, but collapses the dense sub-pixel
             // detail that otherwise bloats the file. A world borders layer drops from ~109 MB
-            // to ~16 MB. The matching PNG render is unaffected (SvgSimplifyTolerance is SVG-only).
-            SvgSimplifyTolerance = 0.5,
+            // to ~16 MB. The matching PNG render is unaffected (Svg options are SVG-only).
+            Svg = new() { SimplifyTolerance = 0.5 },
         };
 
         MapRenderer.RenderSvg(features, "world.svg", options);
@@ -437,7 +437,7 @@ static class Snippets
 
         #region Compression
 
-        // PNG: the deflate level for the IDAT chunk is exposed on RenderOptions.
+        // PNG: the deflate level for the IDAT chunk is exposed on RenderOptions.Png.
         MapRenderer.RenderPng(
             features,
             "world.png",
@@ -445,7 +445,7 @@ static class Snippets
             {
                 Bounds = MapRenderer.WebMercatorWorldBounds,
                 Projection = MapProjection.WebMercator,
-                Compression = CompressionLevel.Fastest,
+                Png = new() { Compression = CompressionLevel.Fastest },
             });
 
         // KMZ: the doc.kml zip entry's compression level is an optional Write argument.

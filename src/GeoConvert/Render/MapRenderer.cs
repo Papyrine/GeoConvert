@@ -85,7 +85,7 @@ public static class MapRenderer
     /// <see cref="RenderOptions"/> (bounds, size, projection, colours, stroke autoscaling, per-layer
     /// styles and labels), the difference being a vector output: geometry becomes SVG path/polyline/circle
     /// elements and labels become native <c>&lt;text&gt;</c>, so the result scales without rasterising.
-    /// <see cref="RenderOptions.Compression"/> is ignored (it is PNG-only).
+    /// <see cref="RenderOptions.Png"/> is ignored (it is PNG-only); use <see cref="RenderOptions.Svg"/>.
     /// </summary>
     public static string RenderSvg(FeatureCollection features, RenderOptions? options = null) =>
         RenderSvg([features], options);
@@ -170,7 +170,7 @@ public static class MapRenderer
     static void RenderSvgTo(IReadOnlyList<FeatureCollection> layers, Stream stream, RenderOptions options, Envelope bounds, ProgressReporter? progress)
     {
         var projection = new Projection(bounds, options);
-        var surface = new SvgSurface(projection.Width, projection.Height, options.Background, options.SvgSimplifyTolerance);
+        var surface = new SvgSurface(projection.Width, projection.Height, options.Background, options.Svg.SimplifyTolerance);
         Paint(surface, projection, layers, options, bounds, progress);
         surface.WriteTo(stream);
     }
@@ -219,7 +219,7 @@ public static class MapRenderer
         var projection = new Projection(bounds, options);
         using var canvas = new Canvas(projection.Width, projection.Height, options.Background);
         Paint(canvas, projection, layers, options, bounds, progress);
-        Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, options.Compression);
+        Png.Write(stream, canvas.Pixels, canvas.Width, canvas.Height, options.Png.Compression);
     }
 
     /// <summary>

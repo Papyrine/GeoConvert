@@ -4,40 +4,112 @@
 public class ExportOptionsTests : BunitTestContext
 {
     [Test]
-    public Task Options_geojson() => VerifyOptions(GeoFormat.GeoJson);
+    public Task Options_geojson()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.GeoJson));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_topojson() => VerifyOptions(GeoFormat.TopoJson);
+    public Task Options_topojson()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.TopoJson));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_flatgeobuf() => VerifyOptions(GeoFormat.FlatGeobuf);
+    public Task Options_flatgeobuf()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.FlatGeobuf));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_kml() => VerifyOptions(GeoFormat.Kml);
+    public Task Options_kml()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Kml));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_kmz() => VerifyOptions(GeoFormat.Kmz);
+    public Task Options_kmz()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Kmz));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_gpx() => VerifyOptions(GeoFormat.Gpx);
+    public Task Options_gpx()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Gpx));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_wkt() => VerifyOptions(GeoFormat.Wkt);
+    public Task Options_wkt()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Wkt));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_wkb() => VerifyOptions(GeoFormat.Wkb);
+    public Task Options_wkb()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Wkb));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_csv() => VerifyOptions(GeoFormat.Csv);
+    public Task Options_csv()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Csv));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_geoparquet() => VerifyOptions(GeoFormat.GeoParquet);
+    public Task Options_geoparquet()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.GeoParquet));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_png() => VerifyOptions(GeoFormat.Png);
+    public Task Options_png()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Png));
+
+        return Verify(cut);
+    }
 
     [Test]
-    public Task Options_svg() => VerifyOptions(GeoFormat.Svg);
+    public Task Options_svg()
+    {
+        var cut = Render<ExportOptions>(_ => _
+            .Add(component => component.Target, GeoFormat.Svg));
+
+        return Verify(cut);
+    }
 
     [Test]
     public async Task PlainFormat_ShowsNoOptionsNote()
@@ -75,13 +147,5 @@ public class ExportOptionsTests : BunitTestContext
         await EventHandlerDispatchExtensions.ChangeAsync(cut.Find("#parquet-codec"), nameof(ParquetCompression.Gzip));
 
         await Assert.That(cut.FindAll("#parquet-gzip").Count).IsEqualTo(1);
-    }
-
-    Task VerifyOptions(GeoFormat target)
-    {
-        var cut = Render<ExportOptions>(_ => _
-            .Add(component => component.Target, target));
-
-        return Verify(cut);
     }
 }

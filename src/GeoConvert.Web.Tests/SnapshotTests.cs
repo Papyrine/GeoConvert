@@ -128,10 +128,12 @@ public class SnapshotTests
             Buffer = Sample.GeoJsonBytes
         });
 
-        var image = await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 30000
-        });
+        var image = await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 30000
+            });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -149,10 +151,12 @@ public class SnapshotTests
 
         await page.ClickAsync(".sample-btn");
 
-        var image = await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 60000
-        });
+        var image = await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 60000
+            });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -172,7 +176,8 @@ public class SnapshotTests
 
         var cdp = await page.Context.NewCDPSessionAsync(page);
         await cdp.SendAsync("Network.enable");
-        await cdp.SendAsync("Network.emulateNetworkConditions",
+        await cdp.SendAsync(
+            "Network.emulateNetworkConditions",
             new()
             {
                 ["offline"] = false,
@@ -209,10 +214,12 @@ public class SnapshotTests
         await Assert.That(detail).DoesNotContain("/");
 
         // And the load still completes to a rendered preview afterwards.
-        await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 60000
-        });
+        await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 60000
+            });
     }
 
     // The Download button runs the actual write/render conversion (off the UI thread) and then hands the
@@ -224,16 +231,20 @@ public class SnapshotTests
         await page.GotoAsync($"http://localhost:{port}/");
         await SettleAsync(page);
 
-        await page.SetInputFilesAsync("#map-file", new FilePayload
-        {
-            Name = "sample.geojson",
-            MimeType = "application/geo+json",
-            Buffer = Sample.GeoJsonBytes
-        });
-        await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 30000
-        });
+        await page.SetInputFilesAsync(
+            "#map-file",
+            new FilePayload
+            {
+                Name = "sample.geojson",
+                MimeType = "application/geo+json",
+                Buffer = Sample.GeoJsonBytes
+            });
+        await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 30000
+            });
 
         // Default target format is KML; clicking Download converts then saves.
         var download = await page.RunAndWaitForDownloadAsync(

@@ -198,6 +198,27 @@ static class Snippets
         Console.WriteLine(markup.Length);
     }
 
+    public static void RenderSvgSimplify()
+    {
+        var features = GeoConverter.Read("countries.geojson");
+
+        #region RenderSvgSimplify
+
+        var options = new RenderOptions
+        {
+            Bounds = MapRenderer.WebMercatorWorldBounds,
+            Width = 1024,
+            // Half a pixel: invisible at this render size, but collapses the dense sub-pixel
+            // detail that otherwise bloats the file. A world borders layer drops from ~109 MB
+            // to ~16 MB. The matching PNG render is unaffected (SvgSimplifyTolerance is SVG-only).
+            SvgSimplifyTolerance = 0.5,
+        };
+
+        MapRenderer.RenderSvg(features, "world.svg", options);
+
+        #endregion
+    }
+
     public static void RenderLayers()
     {
         #region RenderLayers

@@ -253,6 +253,29 @@ The same `RenderOptions` knobs apply (`RenderOptions.Compression` is the one exc
 geoconvert world.geojson europe.svg --bbox -10,35,30,60 --size 1200x900
 ```
 
+### Shrinking SVG output
+
+A world-scale SVG emits every projected vertex, and detailed data (coastlines, country borders) carries far more vertices than a fixed render size can resolve — enough to push a whole-world export past 100 MB. `RenderOptions.SvgSimplifyTolerance` (SVG-only; ignored for the raster PNG) thins those vertices with Douglas–Peucker **in canvas pixel space** as the markup is written, so the tolerance is measured in output pixels rather than degrees. A sub-pixel value is therefore visually lossless at the rendered size while collapsing the redundant detail, and endpoints are always kept so closed rings stay closed. It defaults to `0` (off — every vertex is emitted).
+
+<!-- snippet: RenderSvgSimplify -->
+<a id='snippet-RenderSvgSimplify'></a>
+```cs
+var options = new RenderOptions
+{
+    Bounds = MapRenderer.WebMercatorWorldBounds,
+    Width = 1024,
+    // Half a pixel: invisible at this render size, but collapses the dense sub-pixel
+    // detail that otherwise bloats the file. A world borders layer drops from ~109 MB
+    // to ~16 MB. The matching PNG render is unaffected (SvgSimplifyTolerance is SVG-only).
+    SvgSimplifyTolerance = 0.5,
+};
+
+MapRenderer.RenderSvg(features, "world.svg", options);
+```
+<sup><a href='/src/Tests/Snippets.cs#L205-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderSvgSimplify' title='Start of snippet'>anchor</a></sup>
+<!-- endSnippet -->
+
+Because the pass runs after projection and the `MinFeaturePixels` selection, it only thins geometry that is actually being drawn; raising the tolerance further yields diminishing returns once the per-vertex spacing drops below a pixel.
 
 ### Projection
 
@@ -286,7 +309,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L447-L462' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L468-L483' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -312,7 +335,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L467-L481' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L488-L502' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -341,7 +364,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L486-L505' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L507-L526' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -400,7 +423,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(basemap, "europe.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L203-L247' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L224-L268' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 When the layers come from independent sources (typically a basemap file plus an overlay file), pass the collections as a list — they render in order, first under, last on top. Each `FeatureCollection` is a top-level layer for `RenderOptions.LayerStyle`, and the rendered extent defaults to the union of every input's bounds:
@@ -438,7 +461,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L252-L284' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L273-L305' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -484,7 +507,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L352-L378' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L373-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -521,7 +544,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L383-L410' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L404-L431' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -587,7 +610,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/src/Tests/Snippets.cs#L289-L347' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L310-L368' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -629,7 +652,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/src/Tests/Snippets.cs#L417-L442' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L438-L463' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

@@ -1,0 +1,27 @@
+@* PNG export options: the shared image knobs plus the PNG-only deflate level. Compression doesn't
+   change the rendered pixels, so its control skips the preview refresh and applies only at download. *@
+
+<ImageExportOptions Settings="Settings" OnChanged="OnChanged">
+    <FormatSpecific>
+        <section class="advanced-section">
+            <h4>PNG</h4>
+            <div class="option-row">
+                <label for="png-compression">Compression</label>
+                <select id="png-compression" class="format-select" @bind="Settings.PngCompression">
+                    @foreach (var option in ExportOptionChoices.CompressionLevels)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </select>
+            </div>
+        </section>
+    </FormatSpecific>
+</ImageExportOptions>
+
+@code {
+    [Parameter]
+    public RenderSettings Settings { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+}

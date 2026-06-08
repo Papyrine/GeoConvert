@@ -76,6 +76,31 @@ public static class ConversionService
     }
 
     /// <summary>
+    /// Writes a KMZ with the caller-chosen zip deflate level. Uses the format-specific
+    /// <see cref="Kmz.Write(Stream, FeatureCollection, System.IO.Compression.CompressionLevel)"/>
+    /// overload — which carries the compression option but not a progress sink — so a KMZ download with
+    /// a non-default level shows the busy state rather than a per-feature bar.
+    /// </summary>
+    public static byte[] WriteKmz(FeatureCollection features, KmzSettings settings)
+    {
+        using var stream = new MemoryStream();
+        Kmz.Write(stream, features, settings.Compression);
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Writes a GeoParquet with the caller-chosen data-page codec (and GZIP level when the codec is
+    /// <see cref="ParquetCompression.Gzip"/>). Like <see cref="WriteKmz"/> this uses the option-carrying
+    /// public overload, which does not take a progress sink.
+    /// </summary>
+    public static byte[] WriteGeoParquet(FeatureCollection features, GeoParquetSettings settings)
+    {
+        using var stream = new MemoryStream();
+        GeoParquet.Write(stream, features, settings.Codec, settings.GzipLevel);
+        return stream.ToArray();
+    }
+
+    /// <summary>
     /// Renders a PNG from the caller-chosen <paramref name="settings"/> (projection, size, colours,
     /// strokes, labels and the PNG-only compression level). <paramref name="progress"/> is reported per
     /// feature rasterised.

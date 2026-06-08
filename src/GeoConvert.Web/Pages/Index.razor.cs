@@ -1,36 +1,8 @@
-using System.IO.Compression;
-
 namespace GeoConvert.Web.Pages;
 
 public partial class Index
 {
     const long maxFileSize = 50 * 1024 * 1024;
-
-    public static readonly (MapProjection Value, string Label)[] Projections =
-    [
-        (MapProjection.Auto, "Automatic"),
-        (MapProjection.PlateCarree, "Plate Carrée"),
-        (MapProjection.WebMercator, "Web Mercator"),
-        (MapProjection.Lambert, "Lambert Conformal Conic"),
-        (MapProjection.Goode, "Goode Homolosine"),
-    ];
-
-    public static readonly (int Value, string Label)[] Dimensions =
-    [
-        (512, "512 px"),
-        (1024, "1024 px"),
-        (2048, "2048 px"),
-        (4096, "4096 px"),
-        (8192, "8192 px"),
-    ];
-
-    public static readonly (CompressionLevel Value, string Label)[] CompressionLevels =
-    [
-        (CompressionLevel.Optimal, "Optimal"),
-        (CompressionLevel.SmallestSize, "Smallest size"),
-        (CompressionLevel.Fastest, "Fastest"),
-        (CompressionLevel.NoCompression, "None"),
-    ];
 
     string? sourceName;
     FormatInfo? sourceFormat;
@@ -41,7 +13,11 @@ public partial class Index
     string? issueUrl;
     string? userAgent;
     GeoFormat target = GeoFormat.Kml;
-    readonly RenderSettings settings = new();
+    // One settings object per format family; the dynamically-loaded ExportOptions editor for the
+    // selected target mutates the relevant one.
+    readonly RenderSettings render = new();
+    readonly KmzSettings kmz = new();
+    readonly GeoParquetSettings parquet = new();
     bool isBusy;
     bool isRendering;
     ConvertProgress? progressReport;
@@ -228,7 +204,7 @@ public partial class Index
     {
         try
         {
-            var png = ConversionService.RenderPng(collection, settings, progress);
+            var png = ConversionService.RenderPng(collection, render, progress);
             return $"data:image/png;base64,{Convert.ToBase64String(png)}";
         }
         catch
@@ -265,8 +241,10 @@ public partial class Index
             var format = info.Format;
             var bytes = await Task.Run(() => format switch
             {
-                GeoFormat.Png => ConversionService.RenderPng(collection, settings, progress),
-                GeoFormat.Svg => ConversionService.RenderSvg(collection, settings, progress),
+                GeoFormat.Png => ConversionService.RenderPng(collection, render, progress),
+                GeoFormat.Svg => ConversionService.RenderSvg(collection, render, progress),
+                GeoFormat.Kmz => ConversionService.WriteKmz(collection, kmz),
+                GeoFormat.GeoParquet => ConversionService.WriteGeoParquet(collection, parquet),
                 _ => ConversionService.Write(collection, format, progress),
             });
             var baseName = Path.GetFileNameWithoutExtension(sourceName) ?? "map";

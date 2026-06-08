@@ -1,0 +1,41 @@
+@* Loads the option control for the selected output format. Each writable format that has options gets
+   its own editor; formats with none (GeoJSON, FlatGeobuf, WKT, …) show a short note instead. The host
+   passes one settings object per family — the editors mutate them in place, and image edits raise
+   OnRenderChanged so the preview refreshes. *@
+
+@switch (Target)
+{
+    case GeoFormat.Png:
+        <PngExportOptions Settings="Render" OnChanged="OnRenderChanged" />
+        break;
+    case GeoFormat.Svg:
+        <SvgExportOptions Settings="Render" OnChanged="OnRenderChanged" />
+        break;
+    case GeoFormat.Kmz:
+        <KmzExportOptions Settings="Kmz" />
+        break;
+    case GeoFormat.GeoParquet:
+        <GeoParquetExportOptions Settings="Parquet" />
+        break;
+    default:
+        <p class="no-options">No export options for @(ConversionService.Find(Target)?.DisplayName ?? Target.ToString()).</p>
+        break;
+}
+
+@code {
+    [Parameter]
+    public GeoFormat Target { get; set; }
+
+    [Parameter]
+    public RenderSettings Render { get; set; } = new();
+
+    [Parameter]
+    public KmzSettings Kmz { get; set; } = new();
+
+    [Parameter]
+    public GeoParquetSettings Parquet { get; set; } = new();
+
+    /// <summary>Raised when an image (PNG/SVG) knob changes, so the host can refresh the preview.</summary>
+    [Parameter]
+    public EventCallback OnRenderChanged { get; set; }
+}

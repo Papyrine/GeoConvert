@@ -1,0 +1,23 @@
+@* SVG export options: the shared image knobs plus the SVG-only simplify tolerance. The tolerance
+   thins vector vertices in the SVG output only, so it has no effect on the (raster) preview and skips
+   the preview refresh. *@
+
+<ImageExportOptions Settings="Settings" OnChanged="OnChanged">
+    <FormatSpecific>
+        <section class="advanced-section">
+            <h4>SVG</h4>
+            <div class="option-row">
+                <label for="svg-simplify">Simplify tolerance (px)</label>
+                <input id="svg-simplify" type="number" min="0" max="20" step="0.1" @bind="Settings.SvgSimplifyTolerance" />
+            </div>
+        </section>
+    </FormatSpecific>
+</ImageExportOptions>
+
+@code {
+    [Parameter]
+    public RenderSettings Settings { get; set; } = new();
+
+    [Parameter]
+    public EventCallback OnChanged { get; set; }
+}

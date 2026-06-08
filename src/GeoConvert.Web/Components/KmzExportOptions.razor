@@ -1,0 +1,18 @@
+@* KMZ export options: the zip deflate level for the archived doc.kml entry. *@
+
+<div class="image-options">
+    <div class="format-selector">
+        <label for="kmz-compression">KMZ compression</label>
+        <select id="kmz-compression" class="format-select" @bind="Settings.Compression">
+            @foreach (var option in ExportOptionChoices.CompressionLevels)
+            {
+                <option value="@option.Value">@option.Label</option>
+            }
+        </select>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public KmzSettings Settings { get; set; } = new();
+}

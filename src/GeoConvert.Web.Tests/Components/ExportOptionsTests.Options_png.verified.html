@@ -1,0 +1,105 @@
+﻿<div class="image-options">
+  <div class="format-selector">
+    <label for="projection-select">Map projection</label>
+    <select id="projection-select" class="format-select" value="Auto" blazor:onchange="1">
+      <option value="Auto" selected="">Automatic</option>
+      <option value="PlateCarree">Plate Carrée</option>
+      <option value="WebMercator">Web Mercator</option>
+      <option value="Lambert">Lambert Conformal Conic</option>
+      <option value="Goode">Goode Homolosine</option>
+    </select>
+  </div>
+  <div class="format-selector">
+    <label for="max-dimension">Resolution</label>
+    <select id="max-dimension" class="format-select" value="2048" blazor:onchange="2">
+      <option value="512">512 px</option>
+      <option value="1024">1024 px</option>
+      <option value="2048" selected="">2048 px</option>
+      <option value="4096">4096 px</option>
+      <option value="8192">8192 px</option>
+    </select>
+  </div>
+  <div class="format-selector label-toggle">
+    <label for="show-labels">Labels</label>
+    <input id="show-labels" type="checkbox" blazor:onchange="3">
+  </div>
+</div>
+<details class="advanced-options">
+  <summary>Advanced options</summary>
+  <div class="advanced-grid">
+    <section class="advanced-section">
+      <h4>Size &amp; layout</h4>
+      <div class="option-row">
+        <label for="padding">Padding (px)</label>
+        <input id="padding" type="number" min="0" max="200" value="8" blazor:onchange="4">
+      </div>
+    </section>
+    <section class="advanced-section">
+      <h4>Strokes &amp; features</h4>
+      <div class="option-row">
+        <label for="stroke-width">Stroke width (px)</label>
+        <input id="stroke-width" type="number" min="0" max="50" value="2" blazor:onchange="5">
+      </div>
+      <div class="option-row">
+        <label for="point-radius">Point radius (px)</label>
+        <input id="point-radius" type="number" min="0" max="50" value="4" blazor:onchange="6">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="stroke-autoscale">Auto-scale strokes to zoom</label>
+        <input id="stroke-autoscale" type="checkbox" checked="" blazor:onchange="7">
+      </div>
+      <div class="option-row">
+        <label for="min-feature">Min feature size (px)</label>
+        <input id="min-feature" type="number" min="0" max="64" step="0.5" value="1" blazor:onchange="8">
+      </div>
+      <div class="option-row">
+        <label for="label-size">Label size (px)</label>
+        <input id="label-size" type="number" min="1" max="200" step="0.5" value="14" blazor:onchange="9">
+      </div>
+    </section>
+    <section class="advanced-section">
+      <h4>Colors</h4>
+      <div class="option-row option-row-inline">
+        <label for="background-color">Background</label>
+        <input id="background-color" type="color" value="#ffffff" blazor:onchange="10">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="ocean-enabled">Ocean fill</label>
+        <input id="ocean-enabled" type="checkbox" checked="" blazor:onchange="11">
+        <input type="color" value="#c8dcf0" blazor:onchange="12">
+        <input type="range" min="0" max="255" title="Opacity" value="255" blazor:onchange="13">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="stroke-color">Stroke</label>
+        <input id="stroke-color" type="color" value="#1e1e1e" blazor:onchange="14">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="fill-color">Polygon fill</label>
+        <input id="fill-color" type="color" value="#4682b4" blazor:onchange="15">
+        <input type="range" min="0" max="255" title="Opacity" value="120" blazor:onchange="16">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="label-color">Label text</label>
+        <input id="label-color" type="color" value="#141414" blazor:onchange="17">
+      </div>
+      <div class="option-row option-row-inline">
+        <label for="halo-enabled">Label halo</label>
+        <input id="halo-enabled" type="checkbox" checked="" blazor:onchange="18">
+        <input type="color" value="#ffffff" blazor:onchange="19">
+        <input type="range" min="0" max="255" title="Opacity" value="200" blazor:onchange="20">
+      </div>
+    </section>
+    <section class="advanced-section">
+      <h4>PNG</h4>
+      <div class="option-row">
+        <label for="png-compression">Compression</label>
+        <select id="png-compression" class="format-select" value="Optimal" blazor:onchange="21">
+          <option value="Optimal" selected="">Optimal</option>
+          <option value="SmallestSize">Smallest size</option>
+          <option value="Fastest">Fastest</option>
+          <option value="NoCompression">None</option>
+        </select>
+      </div>
+    </section>
+  </div>
+</details>

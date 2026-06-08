@@ -76,21 +76,45 @@ public static class ConversionService
     }
 
     /// <summary>
-    /// Renders a PNG with caller-chosen layout. <paramref name="projection"/> selects the map
-    /// projection; <paramref name="maxDimension"/>, when positive, caps the image's longer edge at
-    /// that many pixels (the shorter edge follows the aspect ratio) — otherwise the renderer's default
-    /// size applies. <paramref name="progress"/> is reported per feature rasterised.
+    /// Writes a KMZ with the caller-chosen zip deflate level. Uses the format-specific
+    /// <see cref="Kmz.Write(Stream, FeatureCollection, System.IO.Compression.CompressionLevel)"/>
+    /// overload — which carries the compression option but not a progress sink — so a KMZ download with
+    /// a non-default level shows the busy state rather than a per-feature bar.
     /// </summary>
-    public static byte[] RenderPng(FeatureCollection features, MapProjection projection, int maxDimension, bool labels = false, IProgress<ConvertProgress>? progress = null) =>
-        MapRenderer.RenderPng(features, RenderOptionsFor(projection, maxDimension, labels, progress));
+    public static byte[] WriteKmz(FeatureCollection features, KmzSettings settings)
+    {
+        using var stream = new MemoryStream();
+        Kmz.Write(stream, features, settings.Compression);
+        return stream.ToArray();
+    }
 
     /// <summary>
-    /// Renders an SVG with the same layout knobs as <see cref="RenderPng"/> — a vector export instead of
-    /// a raster one. Returned as UTF-8 bytes so it flows through the same download path as every other
-    /// writable format.
+    /// Writes a GeoParquet with the caller-chosen data-page codec (and GZIP level when the codec is
+    /// <see cref="ParquetCompression.Gzip"/>). Like <see cref="WriteKmz"/> this uses the option-carrying
+    /// public overload, which does not take a progress sink.
     /// </summary>
-    public static byte[] RenderSvg(FeatureCollection features, MapProjection projection, int maxDimension, bool labels = false, IProgress<ConvertProgress>? progress = null) =>
-        Encoding.UTF8.GetBytes(MapRenderer.RenderSvg(features, RenderOptionsFor(projection, maxDimension, labels, progress)));
+    public static byte[] WriteGeoParquet(FeatureCollection features, GeoParquetSettings settings)
+    {
+        using var stream = new MemoryStream();
+        GeoParquet.Write(stream, features, settings.Codec, settings.GzipLevel);
+        return stream.ToArray();
+    }
+
+    /// <summary>
+    /// Renders a PNG from the caller-chosen <paramref name="settings"/> (projection, size, colours,
+    /// strokes, labels and the PNG-only compression level). <paramref name="progress"/> is reported per
+    /// feature rasterised.
+    /// </summary>
+    public static byte[] RenderPng(FeatureCollection features, RenderSettings settings, IProgress<ConvertProgress>? progress = null) =>
+        MapRenderer.RenderPng(features, RenderOptionsFor(settings, progress));
+
+    /// <summary>
+    /// Renders an SVG from the same <paramref name="settings"/> as <see cref="RenderPng"/> — a vector
+    /// export instead of a raster one, honouring the SVG-only simplify tolerance. Returned as UTF-8
+    /// bytes so it flows through the same download path as every other writable format.
+    /// </summary>
+    public static byte[] RenderSvg(FeatureCollection features, RenderSettings settings, IProgress<ConvertProgress>? progress = null) =>
+        Encoding.UTF8.GetBytes(MapRenderer.RenderSvg(features, RenderOptionsFor(settings, progress)));
 
     // Common name-like property keys, tried in order, so the label toggle "just works" without the user
     // having to name a property. The web app has no per-property picker (the CLI's --label does), so this
@@ -116,36 +140,48 @@ public static class ConversionService
         return feature.Id?.ToString();
     }
 
-    static RenderOptions RenderOptionsFor(MapProjection projection, int maxDimension, bool labels, IProgress<ConvertProgress>? progress)
+    static RenderOptions RenderOptionsFor(RenderSettings settings, IProgress<ConvertProgress>? progress)
     {
         var options = new RenderOptions
         {
-            Projection = projection,
-            StrokeAutoScale = true,
+            Projection = settings.Projection,
+            Padding = settings.Padding,
+            Background = settings.Background,
+            Stroke = settings.Stroke,
+            Fill = settings.Fill,
+            StrokeWidth = settings.StrokeWidth,
+            PointRadius = settings.PointRadius,
+            StrokeAutoScale = settings.StrokeAutoScale,
+            LabelSize = settings.LabelSize,
+            LabelColor = settings.LabelColor,
             // Paint the projection's world envelope as ocean under every feature. For Goode this is
             // what makes the lobed shape — the curving lobe-boundary meridians and the equator/pole
             // arcs — visible; without it Goode renders as floating continents in a void with none of
             // the projection's defining outlines. For the rectangular projections the envelope is
             // the whole canvas, so this just doubles as a sea-colour background for the world map.
-            Ocean = new(200, 220, 240),
+            // Defaults on (RenderSettings.OceanEnabled), but the user can disable it.
+            Ocean = settings.OceanEnabled ? settings.Ocean : null,
+            LabelHalo = settings.HaloEnabled ? settings.LabelHalo : null,
             // Render-time cartographic selection: drop polygons / lines whose projected bbox is
-            // below 1 px in both axes. Without this, world-scale renders of detailed admin datasets
-            // (the sample world map's thousands of Indonesian / Norwegian / Arctic-Archipelago
-            // islands) paint every sub-pixel feature as a 1-px stroke speck, turning dense coasts
-            // into visual noise instead of recognisable land. At 1 the threshold matches the
-            // "if you can't paint it cleanly, don't paint it at all" floor; raising it (2 or 4)
-            // prunes more aggressively for thumbnails. Zooming in (a tighter Bounds or larger
+            // below this many px in both axes. Defaults to 1 — without it, world-scale renders of
+            // detailed admin datasets (the sample world map's thousands of Indonesian / Norwegian /
+            // Arctic-Archipelago islands) paint every sub-pixel feature as a 1-px stroke speck,
+            // turning dense coasts into visual noise instead of recognisable land. At 1 the threshold
+            // matches the "if you can't paint it cleanly, don't paint it at all" floor; raising it
+            // (2 or 4) prunes more aggressively for thumbnails. Zooming in (a tighter Bounds or larger
             // canvas) naturally surfaces the pruned features again — the filter is render-scale
             // adaptive, not destructive.
-            MinFeaturePixels = 1,
+            MinFeaturePixels = settings.MinFeaturePixels,
+            Png = new() { Compression = settings.PngCompression },
+            Svg = new() { SimplifyTolerance = settings.SvgSimplifyTolerance },
             Progress = progress
         };
-        if (maxDimension > 0)
+        if (settings.MaxDimension > 0)
         {
-            options.MaxDimension = maxDimension;
+            options.MaxDimension = settings.MaxDimension;
         }
 
-        if (labels)
+        if (settings.Labels)
         {
             options.Label = LabelFor;
         }

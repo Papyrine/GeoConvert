@@ -47,6 +47,6 @@ public static class SkiaRenderer
     {
         options ??= new();
         using var surface = MapRenderer.PaintSurface(layers, options, (width, height) => new SkiaSurface(width, height, options.Background));
-        surface.Encode(stream, options.Compression);
+        surface.Encode(stream, options.Png.Compression);
     }
 }

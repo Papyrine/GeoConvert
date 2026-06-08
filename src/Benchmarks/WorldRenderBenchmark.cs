@@ -56,7 +56,7 @@ public class WorldRenderBenchmark
             new()
             {
                 Width = 1024,
-                Compression = CompressionLevel.Fastest,
+                Png = new() { Compression = CompressionLevel.Fastest },
             }).Length;
 
     static int CountVertices(Geometry? geometry) =>

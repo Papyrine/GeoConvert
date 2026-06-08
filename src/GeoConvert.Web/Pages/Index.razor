@@ -70,39 +70,23 @@
             </div>
         }
 
-        @if (previewDataUrl is not null)
-        {
-            <div class="image-options">
-                <div class="format-selector">
-                    <label for="projection-select">Map projection</label>
-                    <select id="projection-select" class="format-select" value="@projection" @onchange="OnProjectionChanged">
-                        @foreach (var option in Projections)
-                        {
-                            <option value="@option.Value">@option.Label</option>
-                        }
-                    </select>
-                </div>
-                <div class="format-selector">
-                    <label for="max-dimension">Max dimension</label>
-                    <select id="max-dimension" class="format-select" value="@maxDimension" @onchange="OnMaxDimensionChanged">
-                        @foreach (var option in Dimensions)
-                        {
-                            <option value="@option.Value">@option.Label</option>
-                        }
-                    </select>
-                </div>
-                <div class="format-selector label-toggle">
-                    <label for="show-labels">Labels</label>
-                    <input id="show-labels" type="checkbox" checked="@showLabels" @onchange="OnShowLabelsChanged" />
-                </div>
-            </div>
-        }
-
         <div class="convert-panel">
             <FormatSelector Label="Convert to"
                             Formats="ConversionService.WritableFormats"
                             Selected="target"
                             SelectedChanged="OnTargetChanged" />
+        </div>
+
+        @* The options control is chosen by the selected output format and loads dynamically — image
+           knobs for PNG/SVG (which refresh the preview), the deflate level for KMZ, the codec for
+           GeoParquet, and a short note for formats with no options. *@
+        <ExportOptions Target="target"
+                       Render="render"
+                       Kmz="kmz"
+                       Parquet="parquet"
+                       OnRenderChanged="RefreshPreviewAsync" />
+
+        <div class="download-row">
             <button class="convert-btn" @onclick="Download" disabled="@(features.Count == 0 || isBusy)">
                 @if (isBusy)
                 {

@@ -128,10 +128,12 @@ public class SnapshotTests
             Buffer = Sample.GeoJsonBytes
         });
 
-        var image = await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 30000
-        });
+        var image = await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 30000
+            });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -149,10 +151,12 @@ public class SnapshotTests
 
         await page.ClickAsync(".sample-btn");
 
-        var image = await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 60000
-        });
+        var image = await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 60000
+            });
         var source = await image!.GetAttributeAsync("src");
 
         await Assert.That(source).StartsWith("data:image/png");
@@ -172,7 +176,8 @@ public class SnapshotTests
 
         var cdp = await page.Context.NewCDPSessionAsync(page);
         await cdp.SendAsync("Network.enable");
-        await cdp.SendAsync("Network.emulateNetworkConditions",
+        await cdp.SendAsync(
+            "Network.emulateNetworkConditions",
             new()
             {
                 ["offline"] = false,
@@ -209,10 +214,12 @@ public class SnapshotTests
         await Assert.That(detail).DoesNotContain("/");
 
         // And the load still completes to a rendered preview afterwards.
-        await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 60000
-        });
+        await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 60000
+            });
     }
 
     // The Download button runs the actual write/render conversion (off the UI thread) and then hands the
@@ -224,16 +231,20 @@ public class SnapshotTests
         await page.GotoAsync($"http://localhost:{port}/");
         await SettleAsync(page);
 
-        await page.SetInputFilesAsync("#map-file", new FilePayload
-        {
-            Name = "sample.geojson",
-            MimeType = "application/geo+json",
-            Buffer = Sample.GeoJsonBytes
-        });
-        await page.WaitForSelectorAsync(".preview img", new()
-        {
-            Timeout = 30000
-        });
+        await page.SetInputFilesAsync(
+            "#map-file",
+            new FilePayload
+            {
+                Name = "sample.geojson",
+                MimeType = "application/geo+json",
+                Buffer = Sample.GeoJsonBytes
+            });
+        await page.WaitForSelectorAsync(
+            ".preview img",
+            new()
+            {
+                Timeout = 30000
+            });
 
         // Default target format is KML; clicking Download converts then saves.
         var download = await page.RunAndWaitForDownloadAsync(
@@ -307,18 +318,24 @@ public class SnapshotTests
         // first boot (the heaviest, run-first test pays the full asset download). Give it generous
         // headroom so a slow runner doesn't time out before the runtime settles — it does settle once
         // the workers are warmed, as every later test in this class confirms.
-        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new()
-        {
-            Timeout = 120000
-        });
+        await page.WaitForLoadStateAsync(
+            LoadState.NetworkIdle,
+            new()
+            {
+                Timeout = 120000
+            });
         // The theme toggle's label is driven by MainLayout.OnInitializedAsync (an async preference
         // load), so until that completes it shows the default-theme label and only then flips to match
         // the active theme. The slower multithreaded boot widens that window, so wait for the label to
         // agree with data-theme — otherwise a dark-theme screenshot can catch the pre-flip "Dark" label.
         await page.WaitForFunctionAsync(
-            "() => { const dark = document.documentElement.getAttribute('data-theme') === 'dark';" +
-            " const b = document.querySelector('.theme-toggle-btn');" +
-            " return b && (dark ? b.textContent.includes('Light') : b.textContent.includes('Dark')); }");
+            """
+            () => {
+                const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+                const b = document.querySelector('.theme-toggle-btn');
+                return b && (dark ? b.textContent.includes('Light') : b.textContent.includes('Dark'));
+            }
+            """);
         await page.EvaluateAsync("() => document.fonts.ready");
     }
 
@@ -326,6 +343,6 @@ public class SnapshotTests
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
-        return ((IPEndPoint)listener.LocalEndpoint).Port;
+        return ((IPEndPoint) listener.LocalEndpoint).Port;
     }
 }

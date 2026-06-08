@@ -4,24 +4,6 @@ public partial class Index
 {
     const long maxFileSize = 50 * 1024 * 1024;
 
-    public static readonly (MapProjection Value, string Label)[] Projections =
-    [
-        (MapProjection.Auto, "Automatic"),
-        (MapProjection.PlateCarree, "Plate Carrée"),
-        (MapProjection.WebMercator, "Web Mercator"),
-        (MapProjection.Lambert, "Lambert Conformal Conic"),
-        (MapProjection.Goode, "Goode Homolosine"),
-    ];
-
-    public static readonly (int Value, string Label)[] Dimensions =
-    [
-        (512, "512 px"),
-        (1024, "1024 px"),
-        (2048, "2048 px"),
-        (4096, "4096 px"),
-        (8192, "8192 px"),
-    ];
-
     string? sourceName;
     FormatInfo? sourceFormat;
     FeatureCollection? features;
@@ -31,9 +13,11 @@ public partial class Index
     string? issueUrl;
     string? userAgent;
     GeoFormat target = GeoFormat.Kml;
-    MapProjection projection = MapProjection.Auto;
-    int maxDimension = 2048;
-    bool showLabels;
+    // One settings object per format family; the dynamically-loaded ExportOptions editor for the
+    // selected target mutates the relevant one.
+    readonly RenderSettings render = new();
+    readonly KmzSettings kmz = new();
+    readonly GeoParquetSettings parquet = new();
     bool isBusy;
     bool isRendering;
     ConvertProgress? progressReport;
@@ -220,7 +204,7 @@ public partial class Index
     {
         try
         {
-            var png = ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress);
+            var png = ConversionService.RenderPng(collection, render, progress);
             return $"data:image/png;base64,{Convert.ToBase64String(png)}";
         }
         catch
@@ -234,28 +218,6 @@ public partial class Index
     {
         target = format;
         return Task.CompletedTask;
-    }
-
-    Task OnProjectionChanged(ChangeEventArgs args)
-    {
-        projection = Enum.Parse<MapProjection>((string) args.Value!);
-        return RefreshPreviewAsync();
-    }
-
-    Task OnMaxDimensionChanged(ChangeEventArgs args)
-    {
-        if (int.TryParse((string?) args.Value, out var value) && value > 0)
-        {
-            maxDimension = value;
-        }
-
-        return RefreshPreviewAsync();
-    }
-
-    Task OnShowLabelsChanged(ChangeEventArgs args)
-    {
-        showLabels = args.Value is true;
-        return RefreshPreviewAsync();
     }
 
     async Task Download()
@@ -279,8 +241,10 @@ public partial class Index
             var format = info.Format;
             var bytes = await Task.Run(() => format switch
             {
-                GeoFormat.Png => ConversionService.RenderPng(collection, projection, maxDimension, showLabels, progress),
-                GeoFormat.Svg => ConversionService.RenderSvg(collection, projection, maxDimension, showLabels, progress),
+                GeoFormat.Png => ConversionService.RenderPng(collection, render, progress),
+                GeoFormat.Svg => ConversionService.RenderSvg(collection, render, progress),
+                GeoFormat.Kmz => ConversionService.WriteKmz(collection, kmz),
+                GeoFormat.GeoParquet => ConversionService.WriteGeoParquet(collection, parquet),
                 _ => ConversionService.Write(collection, format, progress),
             });
             var baseName = Path.GetFileNameWithoutExtension(sourceName) ?? "map";

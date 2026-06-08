@@ -299,6 +299,104 @@ header p {
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
+.download-row {
+    display: flex;
+}
+
+.no-options {
+    margin: 0;
+    padding: 1rem 1.5rem;
+    color: var(--muted-color, var(--text-color));
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+    font-size: 0.9rem;
+}
+
+.advanced-options {
+    margin-top: 0.75rem;
+    padding: 0 1.5rem;
+    background: var(--surface-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.advanced-options > summary {
+    padding: 1rem 0;
+    font-weight: 500;
+    cursor: pointer;
+    user-select: none;
+}
+
+.advanced-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 1.5rem;
+    padding-bottom: 1.5rem;
+}
+
+.advanced-section h4 {
+    margin: 0 0 0.75rem;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted-color, var(--text-color));
+}
+
+.option-row {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    margin-bottom: 0.75rem;
+}
+
+.option-row-inline {
+    flex-direction: row;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.option-row label {
+    font-size: 0.9rem;
+}
+
+.option-row-inline label {
+    flex: 1;
+    min-width: 0;
+}
+
+.option-row input[type="number"] {
+    padding: 0.4rem 0.5rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-color);
+    color: var(--text-color);
+    font-size: 0.9rem;
+    width: 100%;
+}
+
+.option-row input[type="color"] {
+    width: 2.25rem;
+    height: 2rem;
+    padding: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--background-color);
+    cursor: pointer;
+}
+
+.option-row input[type="range"] {
+    flex: 1;
+    min-width: 60px;
+}
+
+.option-row input[type="checkbox"] {
+    width: 1.1rem;
+    height: 1.1rem;
+}
+
 .btn-spinner {
     display: inline-block;
     width: 1em;

@@ -1,6 +1,6 @@
 /// <summary>
 /// Douglas–Peucker vertex reduction in canvas pixel space — the size-shrinking pass behind
-/// <see cref="RenderOptions.SvgSimplifyTolerance"/>. It operates on the renderer's projected
+/// <see cref="SvgOptions.SimplifyTolerance"/>. It operates on the renderer's projected
 /// <c>(X, Y)</c> pixel tuples rather than lon/lat <see cref="Position"/>s (the geometry-model
 /// <see cref="LineSimplifier"/> is the lon/lat counterpart), so the tolerance is measured in output
 /// pixels and a sub-pixel value is visually lossless at the rendered size. The first and last vertex

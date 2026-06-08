@@ -424,14 +424,17 @@ public class SvgTests
             new Feature(new LineString(line)),
         };
 
-        RenderOptions Options(double tolerance) =>
+        static RenderOptions Options(double tolerance) =>
             new()
             {
                 Bounds = new Envelope(0, 0, 10, 6),
                 Width = 200,
                 Height = 120,
                 Projection = MapProjection.PlateCarree,
-                SvgSimplifyTolerance = tolerance,
+                Svg = new()
+                {
+                    SimplifyTolerance = tolerance
+                },
             };
 
         var full = MapRenderer.RenderSvg(features, Options(0));
@@ -443,5 +446,8 @@ public class SvgTests
     }
 
     static Dictionary<string, object?> Props(string key, object? value) =>
-        new() { [key] = value };
+        new()
+        {
+            [key] = value
+        };
 }

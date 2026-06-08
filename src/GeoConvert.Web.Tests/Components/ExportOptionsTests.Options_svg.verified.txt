@@ -1,0 +1,65 @@
+﻿{
+  Instance: {
+    Target: Svg,
+    Render: {
+      MaxDimension: 2048,
+      Padding: 8,
+      StrokeWidth: 2,
+      PointRadius: 4,
+      StrokeAutoScale: true,
+      MinFeaturePixels: 1.0,
+      Labels: false,
+      LabelSize: 14.0,
+      Background: {
+        R: 255,
+        G: 255,
+        B: 255,
+        A: 255
+      },
+      OceanEnabled: true,
+      Ocean: {
+        R: 200,
+        G: 220,
+        B: 240,
+        A: 255
+      },
+      Stroke: {
+        R: 30,
+        G: 30,
+        B: 30,
+        A: 255
+      },
+      Fill: {
+        R: 70,
+        G: 130,
+        B: 180,
+        A: 120
+      },
+      LabelColor: {
+        R: 20,
+        G: 20,
+        B: 20,
+        A: 255
+      },
+      HaloEnabled: true,
+      LabelHalo: {
+        R: 255,
+        G: 255,
+        B: 255,
+        A: 200
+      },
+      BackgroundHex: #ffffff,
+      OceanHex: #c8dcf0,
+      OceanOpacity: 255,
+      StrokeHex: #1e1e1e,
+      FillHex: #4682b4,
+      FillOpacity: 120,
+      LabelColorHex: #141414,
+      LabelHaloHex: #ffffff,
+      LabelHaloOpacity: 200
+    },
+    Kmz: {},
+    Parquet: {}
+  },
+  NodeCount: 147
+}

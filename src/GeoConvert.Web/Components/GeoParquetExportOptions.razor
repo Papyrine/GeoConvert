@@ -1,0 +1,31 @@
+@* GeoParquet export options: the data-page codec, plus the deflate level shown only when the codec is
+   GZIP (Snappy and Uncompressed ignore it). *@
+
+<div class="image-options">
+    <div class="format-selector">
+        <label for="parquet-codec">Compression codec</label>
+        <select id="parquet-codec" class="format-select" @bind="Settings.Codec">
+            @foreach (var option in ExportOptionChoices.ParquetCodecs)
+            {
+                <option value="@option.Value">@option.Label</option>
+            }
+        </select>
+    </div>
+    @if (Settings.Codec == ParquetCompression.Gzip)
+    {
+        <div class="format-selector">
+            <label for="parquet-gzip">GZIP level</label>
+            <select id="parquet-gzip" class="format-select" @bind="Settings.GzipLevel">
+                @foreach (var option in ExportOptionChoices.CompressionLevels)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </select>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter]
+    public GeoParquetSettings Settings { get; set; } = new();
+}

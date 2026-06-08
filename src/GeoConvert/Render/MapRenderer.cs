@@ -170,7 +170,7 @@ public static class MapRenderer
     static void RenderSvgTo(IReadOnlyList<FeatureCollection> layers, Stream stream, RenderOptions options, Envelope bounds, ProgressReporter? progress)
     {
         var projection = new Projection(bounds, options);
-        var surface = new SvgSurface(projection.Width, projection.Height, options.Background);
+        var surface = new SvgSurface(projection.Width, projection.Height, options.Background, options.SvgSimplifyTolerance);
         Paint(surface, projection, layers, options, bounds, progress);
         surface.WriteTo(stream);
     }

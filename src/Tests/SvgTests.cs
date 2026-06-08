@@ -398,6 +398,50 @@ public class SvgTests
         return Verify(svg, "svg");
     }
 
+    [Test]
+    public async Task Simplify_tolerance_thins_rings_and_polylines()
+    {
+        // A polygon ring and a line each densely sampled with near-collinear vertices: at sub-pixel
+        // tolerance Douglas–Peucker collapses the redundant points, so the simplified SVG is shorter
+        // while both element kinds still render.
+        var ring = new List<Position>();
+        var line = new List<Position>();
+        for (var i = 0; i <= 100; i++)
+        {
+            var x = i / 10.0;
+            // A barely-perceptible wobble (well under a pixel once projected) on an otherwise straight edge.
+            ring.Add(new(x, 5 + (i % 2) * 0.001));
+            line.Add(new(x, 2 + (i % 2) * 0.001));
+        }
+
+        ring.Add(new(10, 0));
+        ring.Add(new(0, 0));
+        ring.Add(ring[0]);
+
+        var features = new FeatureCollection
+        {
+            new Feature(new Polygon([ring])),
+            new Feature(new LineString(line)),
+        };
+
+        RenderOptions Options(double tolerance) =>
+            new()
+            {
+                Bounds = new Envelope(0, 0, 10, 6),
+                Width = 200,
+                Height = 120,
+                Projection = MapProjection.PlateCarree,
+                SvgSimplifyTolerance = tolerance,
+            };
+
+        var full = MapRenderer.RenderSvg(features, Options(0));
+        var simplified = MapRenderer.RenderSvg(features, Options(0.5));
+
+        await Assert.That(simplified.Length).IsLessThan(full.Length);
+        await Assert.That(simplified).Contains("<path ");
+        await Assert.That(simplified).Contains("<polyline ");
+    }
+
     static Dictionary<string, object?> Props(string key, object? value) =>
         new() { [key] = value };
 }

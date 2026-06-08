@@ -14,7 +14,7 @@
 /// reserves its boxes from the hand-rolled stroke font's metrics.
 /// </para>
 /// </summary>
-sealed class SvgSurface(int width, int height, Rgba background) :
+sealed class SvgSurface(int width, int height, Rgba background, double simplifyTolerance) :
     IRenderSurface
 {
     StringBuilder body = new();
@@ -49,6 +49,13 @@ sealed class SvgSurface(int width, int height, Rgba background) :
         if (points.Count < 2)
         {
             return;
+        }
+
+        // Drop sub-tolerance vertices in pixel space (endpoints kept, so the count stays >= 2) to
+        // keep the emitted polyline compact. No-op when simplification is off.
+        if (simplifyTolerance > 0)
+        {
+            points = PixelSimplifier.Simplify(points, simplifyTolerance);
         }
 
         body.Append("<polyline points=\"");
@@ -143,10 +150,13 @@ sealed class SvgSurface(int width, int height, Rgba background) :
 
     void AppendRingPath((double X, double Y)[] ring)
     {
-        for (var i = 0; i < ring.Length; i++)
+        // Thin the ring in pixel space before emitting its path (the Z closure still re-joins the
+        // surviving first vertex). No-op when simplification is off.
+        var points = simplifyTolerance > 0 ? PixelSimplifier.Simplify(ring, simplifyTolerance) : ring;
+        for (var i = 0; i < points.Length; i++)
         {
             body.Append(i == 0 ? 'M' : 'L')
-                .Append(Format(ring[i].X)).Append(',').Append(Format(ring[i].Y));
+                .Append(Format(points[i].X)).Append(',').Append(Format(points[i].Y));
         }
 
         body.Append('Z');

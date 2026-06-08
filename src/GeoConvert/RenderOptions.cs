@@ -201,6 +201,21 @@ public sealed class RenderOptions
     public CompressionLevel Compression { get; set; } = CompressionLevel.Optimal;
 
     /// <summary>
+    /// Pixel-space vertex reduction applied to the SVG output only (it is ignored for PNG, which is
+    /// raster and gains nothing from thinning vertices). When positive, each emitted polygon ring and
+    /// polyline is simplified with Douglas–Peucker in canvas pixel space at this tolerance — a vertex
+    /// sitting less than this many pixels off the chord between its surviving neighbours is dropped,
+    /// always keeping the first and last vertex so closed rings stay closed. Because the threshold is
+    /// in output pixels it is resolution-aware: a value below ~1 is visually lossless at the rendered
+    /// size while still collapsing the dense sub-pixel detail (detailed coastlines, country borders)
+    /// that otherwise bloats a world-scale SVG to hundreds of megabytes. The pass runs after
+    /// projection and the <see cref="MinFeaturePixels"/> selection, so it only thins geometry that is
+    /// actually being drawn. Defaults to <c>0</c> (off): every projected vertex is emitted, matching
+    /// the existing 2-decimal-rounded coordinate output.
+    /// </summary>
+    public double SvgSimplifyTolerance { get; set; }
+
+    /// <summary>
     /// Optional progress sink notified as features are rasterised. Reports under
     /// <see cref="ProgressPhase.Writing"/> with <see cref="ConvertProgress.FeatureTotal"/> set to the
     /// total feature count across every layer, incrementing once per feature during the geometry pass

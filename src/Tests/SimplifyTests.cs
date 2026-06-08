@@ -5,7 +5,7 @@ using G = TestSupport;
 public class SimplifyTests
 {
     static IReadOnlyList<Position> Line(Geometry geometry) =>
-        ((LineString)geometry).Positions;
+        ((LineString) geometry).Positions;
 
     [Test]
     public async Task DouglasPeucker_drops_collinear_vertices()
@@ -85,7 +85,7 @@ public class SimplifyTests
         [
             [new(0, 0), new(2, 0.001), new(4, 0), new(4, 4), new(0, 4), new(0, 0)],
         ]);
-        var result = (Polygon)Simplifier.Simplify(polygon, 0.01);
+        var result = (Polygon) Simplifier.Simplify(polygon, 0.01);
         var ring = result.Rings[0];
         await Assert.That(ring.Count).IsEqualTo(5);
         // First and last vertex still coincide — the ring stays closed.
@@ -109,7 +109,7 @@ public class SimplifyTests
             new(0, 0)
         };
         var polygon = new Polygon([ring]);
-        var result = (Polygon)Simplifier.Simplify(polygon, 1000);
+        var result = (Polygon) Simplifier.Simplify(polygon, 1000);
         var reduced = result.Rings[0];
         // Triangle plus its closing vertex, still closed, every vertex drawn from the original ring.
         await Assert.That(reduced.Count).IsEqualTo(4);
@@ -135,7 +135,7 @@ public class SimplifyTests
             new(2, 2)
         };
         var polygon = new Polygon([ring]);
-        var result = (Polygon)Simplifier.Simplify(polygon, 1000);
+        var result = (Polygon) Simplifier.Simplify(polygon, 1000);
         await Assert.That(result.Rings[0].Count).IsEqualTo(5);
     }
 
@@ -154,7 +154,7 @@ public class SimplifyTests
             new(0, 0)
         };
         var polygon = new Polygon([ring]);
-        var result = (Polygon)Simplifier.Simplify(polygon, 1000);
+        var result = (Polygon) Simplifier.Simplify(polygon, 1000);
         await Assert.That(result.Rings[0].Count).IsEqualTo(5);
     }
 
@@ -183,7 +183,7 @@ public class SimplifyTests
             new([new(0, 0), new(1, 0), new(2, 0)]),
             new([new(0, 0), new(1, 1), new(2, 0)]),
         ]);
-        var result = (MultiLineString)Simplifier.Simplify(multi, 0.5);
+        var result = (MultiLineString) Simplifier.Simplify(multi, 0.5);
         await Assert.That(result.LineStrings[0].Positions.Count).IsEqualTo(2);
         await Assert.That(result.LineStrings[1].Positions.Count).IsEqualTo(3);
     }
@@ -195,7 +195,7 @@ public class SimplifyTests
         [
             new([[new(0, 0), new(2, 0.001), new(4, 0), new(4, 4), new(0, 4), new(0, 0)]]),
         ]);
-        var result = (MultiPolygon)Simplifier.Simplify(multi, 0.01);
+        var result = (MultiPolygon) Simplifier.Simplify(multi, 0.01);
         await Assert.That(result.Polygons[0].Rings[0].Count).IsEqualTo(5);
     }
 
@@ -207,16 +207,16 @@ public class SimplifyTests
             new Point(1, 2),
             new LineString([new(0, 0), new(1, 0), new(2, 0)]),
         ]);
-        var result = (GeometryCollection)Simplifier.Simplify(collection, 0.0001);
+        var result = (GeometryCollection) Simplifier.Simplify(collection, 0.0001);
         await Assert.That(result.Geometries[0].Type).IsEqualTo(GeometryType.Point);
-        await Assert.That(((LineString)result.Geometries[1]).Positions.Count).IsEqualTo(2);
+        await Assert.That(((LineString) result.Geometries[1]).Positions.Count).IsEqualTo(2);
     }
 
     [Test]
     public async Task Unknown_method_throws()
     {
         var line = new LineString([new(0, 0), new(1, 0), new(2, 0)]);
-        await Assert.That(G.ThrowsGeo(() => Simplifier.Simplify(line, 0.1, (SimplifyMethod)99))).IsTrue();
+        await Assert.That(G.ThrowsGeo(() => Simplifier.Simplify(line, 0.1, (SimplifyMethod) 99))).IsTrue();
     }
 
     [Test]
@@ -296,8 +296,8 @@ public class SimplifyTests
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
 
-        var westRing = ((Polygon)result.Features[0].Geometry!).Rings[0];
-        var eastRing = ((Polygon)result.Features[1].Geometry!).Rings[0];
+        var westRing = ((Polygon) result.Features[0].Geometry!).Rings[0];
+        var eastRing = ((Polygon) result.Features[1].Geometry!).Rings[0];
 
         // The near-collinear (2, 2.001) is gone on both sides.
         await Assert.That(westRing.Contains(new(2, 2.001))).IsFalse();
@@ -342,8 +342,8 @@ public class SimplifyTests
 
         var result = Simplifier.SimplifyTopology(collection, 0.1);
 
-        var westRing = ((Polygon)result.Features[0].Geometry!).Rings[0];
-        var eastRing = ((Polygon)result.Features[1].Geometry!).Rings[0];
+        var westRing = ((Polygon) result.Features[0].Geometry!).Rings[0];
+        var eastRing = ((Polygon) result.Features[1].Geometry!).Rings[0];
 
         // The kink at (2.5, 2) sits 0.5 off the chord between the shared junctions (2,0) and (2,4),
         // far above the 0.1 tolerance, so it stays on both sides.
@@ -366,7 +366,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var ring = ((Polygon)result.Features[0].Geometry!).Rings[0];
+        var ring = ((Polygon) result.Features[0].Geometry!).Rings[0];
 
         await Assert.That(ring.Count).IsEqualTo(5);
         await Assert.That(ring[0]).IsEqualTo(ring[^1]);
@@ -388,7 +388,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 1000);
-        var ring = ((Polygon)result.Features[0].Geometry!).Rings[0];
+        var ring = ((Polygon) result.Features[0].Geometry!).Rings[0];
 
         await Assert.That(ring.Count).IsEqualTo(4);
         await Assert.That(ring[0]).IsEqualTo(ring[^1]);
@@ -409,7 +409,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var polygon = (Polygon)result.Features[0].Geometry!;
+        var polygon = (Polygon) result.Features[0].Geometry!;
 
         await Assert.That(polygon.Rings.Count).IsEqualTo(2);
         await Assert.That(polygon.Rings[0].Count).IsEqualTo(5);
@@ -430,8 +430,8 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var inner = (GeometryCollection)result.Features[0].Geometry!;
-        var rebuiltMulti = (MultiPolygon)inner.Geometries[0];
+        var inner = (GeometryCollection) result.Features[0].Geometry!;
+        var rebuiltMulti = (MultiPolygon) inner.Geometries[0];
 
         await Assert.That(rebuiltMulti.Polygons.Count).IsEqualTo(2);
         await Assert.That(rebuiltMulti.Polygons[0].Rings[0].Count).IsEqualTo(5);
@@ -450,7 +450,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var line = (LineString)result.Features[0].Geometry!;
+        var line = (LineString) result.Features[0].Geometry!;
 
         await Assert.That(line.Positions.Count).IsEqualTo(2);
         await Assert.That(line.Positions[0]).IsEqualTo(new(0, 0));
@@ -472,7 +472,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var lineA = (LineString)result.Features[0].Geometry!;
+        var lineA = (LineString) result.Features[0].Geometry!;
 
         // Line A is split at (4,0). The near-collinear (2, 0.001) is dropped on its first arc,
         // and the (4,0) junction survives at the split — so line A reads as (0,0)-(4,0)-(4,4).
@@ -497,7 +497,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01);
-        var multi = (MultiLineString)result.Features[0].Geometry!;
+        var multi = (MultiLineString) result.Features[0].Geometry!;
 
         await Assert.That(multi.LineStrings[0].Positions.Count).IsEqualTo(2);
         await Assert.That(multi.LineStrings[1].Positions.Count).IsEqualTo(3);
@@ -616,11 +616,11 @@ public class SimplifyTests
         var result = Simplifier.SimplifyTopology(collection, 0.01);
 
         await Assert.That(Line(result.Features[0].Geometry!).Count).IsEqualTo(2);
-        await Assert.That(((Polygon)result.Features[1].Geometry!).Rings[0].Count).IsEqualTo(3);
-        var degenerate = (Polygon)result.Features[2].Geometry!;
+        await Assert.That(((Polygon) result.Features[1].Geometry!).Rings[0].Count).IsEqualTo(3);
+        var degenerate = (Polygon) result.Features[2].Geometry!;
         await Assert.That(degenerate.Rings[0].Count).IsEqualTo(2);
         await Assert.That(degenerate.Rings[1].Count).IsEqualTo(0);
-        var multi = (MultiLineString)result.Features[3].Geometry!;
+        var multi = (MultiLineString) result.Features[3].Geometry!;
         await Assert.That(multi.LineStrings[0].Positions.Count).IsEqualTo(0);
         await Assert.That(multi.LineStrings[1].Positions.Count).IsEqualTo(2);
     }
@@ -655,9 +655,9 @@ public class SimplifyTests
         };
 
         var replacements = TopologySimplifier.BuildReplacements(collection, 0.001, SimplifyMethod.DouglasPeucker);
-        var allJunctions = ((Polygon)collection.Features[0].Geometry!).Rings[0]
-            .Concat(((Polygon)collection.Features[1].Geometry!).Rings[0])
-            .Concat(((Polygon)collection.Features[2].Geometry!).Rings[0])
+        var allJunctions = ((Polygon) collection.Features[0].Geometry!).Rings[0]
+            .Concat(((Polygon) collection.Features[1].Geometry!).Rings[0])
+            .Concat(((Polygon) collection.Features[2].Geometry!).Rings[0])
             .Distinct()
             .ToList();
 
@@ -665,7 +665,7 @@ public class SimplifyTests
         // all four "different neighbours" cases. Confirm the rebuild ran end-to-end with the
         // junction set classifying every shared vertex without collapsing any triangle below the
         // minimum.
-        await Assert.That(allJunctions.Contains(new Position(1, 1))).IsTrue();
+        await Assert.That(allJunctions.Contains(new(1, 1))).IsTrue();
         await Assert.That(replacements.Count).IsEqualTo(3);
         foreach (var ring in replacements.Values)
         {
@@ -680,28 +680,30 @@ public class SimplifyTests
         // proves it isn't DP-specific.
         var collection = new FeatureCollection
         {
-            new Feature(new Polygon([
-                [
-                    new(0, 0), new(0, 4), new(2, 4), new(2, 2), new(2, 0), new(0, 0),
-                ]
-            ])),
-            new Feature(new Polygon([
-                [
-                    new(2, 0), new(2, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
-                ]
-            ])),
+            new Feature(
+                new Polygon([
+                    [
+                        new(0, 0), new(0, 4), new(2, 4), new(2, 2), new(2, 0), new(0, 0),
+                    ]
+                ])),
+            new Feature(
+                new Polygon([
+                    [
+                        new(2, 0), new(2, 2), new(2, 4), new(4, 4), new(4, 0), new(2, 0),
+                    ]
+                ])),
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.01, SimplifyMethod.Visvalingam);
-        var westRing = ((Polygon)result.Features[0].Geometry!).Rings[0];
-        var eastRing = ((Polygon)result.Features[1].Geometry!).Rings[0];
+        var westRing = ((Polygon) result.Features[0].Geometry!).Rings[0];
+        var eastRing = ((Polygon) result.Features[1].Geometry!).Rings[0];
 
         // The straight-line interior vertex (2,2) has zero effective area on the shared edge and
         // is dropped on both sides; the junction endpoints (2,0)/(2,4) survive.
-        await Assert.That(westRing.Contains(new Position(2, 2))).IsFalse();
-        await Assert.That(eastRing.Contains(new Position(2, 2))).IsFalse();
-        await Assert.That(westRing.Contains(new Position(2, 0))).IsTrue();
-        await Assert.That(westRing.Contains(new Position(2, 4))).IsTrue();
+        await Assert.That(westRing.Contains(new(2, 2))).IsFalse();
+        await Assert.That(eastRing.Contains(new(2, 2))).IsFalse();
+        await Assert.That(westRing.Contains(new(2, 0))).IsTrue();
+        await Assert.That(westRing.Contains(new(2, 4))).IsTrue();
     }
 
     // Two coincident-XY vertices that differ only in Z must sort distinctly so the (prev, next)
@@ -729,7 +731,7 @@ public class SimplifyTests
         };
 
         var result = Simplifier.SimplifyTopology(collection, 0.001);
-        var rebuilt = ((Polygon)result.Features[0].Geometry!).Rings[0];
+        var rebuilt = ((Polygon) result.Features[0].Geometry!).Rings[0];
 
         // Closure preserved (first == last); the simplifier didn't throw on the zero-XY chord.
         await Assert.That(rebuilt[0]).IsEqualTo(rebuilt[^1]);

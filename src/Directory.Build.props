@@ -7,10 +7,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <PackageTags>geojson;shapefile;flatgeobuf;topojson;kml;kmz;gpx;wkt;wkb;gis;geospatial;conversion</PackageTags>
-    <NoWarn>$(NoWarn);CS1591;NU1608;NU1109;IDE0005</NoWarn>
+    <NoWarn>$(NoWarn);CS1591;NU1608;NU1109;IDE0005;SC023</NoWarn>
     <SixLaborsLicenseKey>Id=ctm_01krfkytx8bzkq3gsjc92kfmyq;Kind=Community;ExpiryDateUtc=2026-08-11T02:51:50.6859907Z;Key=dThkxk4kvSECuuETfS2hoQMb2BsKsRSPAxKFRsvG2Gxi0smIdE8TlSezXCDmvg87+9Ry64otiBl98lhE4c6L8A==</SixLaborsLicenseKey>
     <PackageLicenseFile>OsmfEula.txt</PackageLicenseFile>
     <PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
+    <Papyrine_SponsorshipLicenseIgnored>true</Papyrine_SponsorshipLicenseIgnored>
   </PropertyGroup>
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\OsmfEula.txt" Pack="true" PackagePath="" Visible="false" />

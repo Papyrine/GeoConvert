@@ -16,4 +16,18 @@
   <ItemGroup>
     <None Include="$(MSBuildThisFileDirectory)..\OsmfEula.txt" Pack="true" PackagePath="" Visible="false" />
   </ItemGroup>
+  <!--
+    Native-asset packages (notably SkiaSharp 4.148+) ship large native debug-symbol (.pdb) files under
+    runtimes/<rid>/native/ — ~85-90 MB each, for every RID. They are never needed at runtime but balloon
+    packed .NET tools by well over 100 MB (the geoconvert and geoconvert-app tool nupkgs each jumped to
+    ~180 MB after the SkiaSharp 3.x -> 4.148 bump). Strip them from any project that publishes; the
+    target is inert for library packs, which don't run the publish pipeline. Native runtime libs
+    themselves are kept, so cross-platform tools still work on every OS.
+  -->
+  <Target Name="TrimNativeSymbols" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.pdb' and $([System.String]::Copy('%(RelativePath)').Contains('native'))" />
+    </ItemGroup>
+  </Target>
 </Project>

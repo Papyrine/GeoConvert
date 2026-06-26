@@ -46,16 +46,13 @@
   </Target>
 
   <!--
-    SkiaSharp 4.148 ships ~90 MB of native debug-symbol (.pdb) files plus native libs for every OS,
-    which balloons the packed tool past 180 MB. This is a Windows-only WinForms tool, so strip the
-    native symbols (never needed at runtime) and the non-Windows native libs from what gets packaged.
-    Brings the nupkg back to tens of MB. (The geoconvert CLI has the same latent bloat from the same
-    SkiaSharp bump.)
+    The shared TrimNativeSymbols target (Directory.Build.props) already strips the native .pdb symbols.
+    This is additionally a Windows-only WinForms tool, so drop the non-Windows native libs too — they
+    can never load here. Together with the shared symbol strip this keeps the nupkg to tens of MB
+    (win-only libSkiaSharp), down from ~180 MB.
   -->
-  <Target Name="TrimNativeAssets" AfterTargets="ComputeFilesToPublish">
+  <Target Name="TrimNonWindowsNativeAssets" AfterTargets="ComputeFilesToPublish">
     <ItemGroup>
-      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-                             Condition="'%(Extension)' == '.pdb' and $([System.String]::Copy('%(RelativePath)').Contains('native'))" />
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
                              Condition="$([System.String]::Copy('%(RelativePath)').Replace('\', '/').Contains('runtimes/osx')) or $([System.String]::Copy('%(RelativePath)').Replace('\', '/').Contains('runtimes/linux'))" />
     </ItemGroup>

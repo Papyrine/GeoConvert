@@ -49,13 +49,8 @@ sealed class SkiaSurface : IRenderSurface, IDisposable
                 continue;
             }
 
-            path.MoveTo((float)ring[0].X, (float)ring[0].Y);
-            for (var i = 1; i < ring.Length; i++)
-            {
-                path.LineTo((float)ring[i].X, (float)ring[i].Y);
-            }
-
-            path.Close();
+            // Each ring is a closed sub-path; even-odd fill makes interior rings cut holes.
+            AppendChain(path, ring, close: true);
         }
 
         using var paint = Fill(color);
@@ -71,11 +66,8 @@ sealed class SkiaSurface : IRenderSurface, IDisposable
         }
 
         using var path = new SKPath();
-        path.MoveTo((float)points[0].X, (float)points[0].Y);
-        for (var i = 1; i < points.Count; i++)
-        {
-            path.LineTo((float)points[i].X, (float)points[i].Y);
-        }
+        // Open polyline — no closing segment back to the start.
+        AppendChain(path, points, close: false);
 
         using var paint = new SKPaint
         {
@@ -120,11 +112,11 @@ sealed class SkiaSurface : IRenderSurface, IDisposable
                 StrokeWidth = Math.Max(1f, emSize / 6f),
                 StrokeJoin = SKStrokeJoin.Round,
             };
-            canvas.DrawText(text, (float)leftX, (float)baselineY, font, haloPaint);
+            canvas.DrawText(text, (float)leftX, (float)baselineY, SKTextAlign.Left, font, haloPaint);
         }
 
         using var paint = Fill(color);
-        canvas.DrawText(text, (float)leftX, (float)baselineY, font, paint);
+        canvas.DrawText(text, (float)leftX, (float)baselineY, SKTextAlign.Left, font, paint);
     }
 
     /// <summary>Encodes the painted bitmap as a PNG to <paramref name="stream"/>. Skia chooses its own
@@ -136,6 +128,27 @@ sealed class SkiaSurface : IRenderSurface, IDisposable
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
         data.SaveTo(stream);
     }
+
+    // SkiaSharp 4.148 marks the imperative SKPath build methods (MoveTo/LineTo/Close) obsolete in
+    // favour of SKPathBuilder, but that type is not shipped in this package version — the imperative
+    // surface is the only available way to build a path. Keep the obsolete calls confined here and
+    // suppress CS0618 (warnings are errors) at the single point that touches them. Callers guard
+    // against empty input, so points[0] is always present.
+#pragma warning disable CS0618 // SKPathBuilder (the suggested replacement) is absent from SkiaSharp 4.148.0.
+    static void AppendChain(SKPath path, IReadOnlyList<(double X, double Y)> points, bool close)
+    {
+        path.MoveTo((float)points[0].X, (float)points[0].Y);
+        for (var i = 1; i < points.Count; i++)
+        {
+            path.LineTo((float)points[i].X, (float)points[i].Y);
+        }
+
+        if (close)
+        {
+            path.Close();
+        }
+    }
+#pragma warning restore CS0618
 
     static SKPaint Fill(Rgba color) =>
         new()

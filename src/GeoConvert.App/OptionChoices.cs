@@ -19,6 +19,7 @@ public static class OptionChoices
     public static readonly (RendererBackend Value, string Label)[] Renderers =
     [
         (RendererBackend.BuiltIn, "Built-in (dependency-free)"),
+        (RendererBackend.Skia, "SkiaSharp"),
         (RendererBackend.ImageSharp, "ImageSharp"),
     ];
 

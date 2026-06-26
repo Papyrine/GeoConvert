@@ -9,6 +9,9 @@ public enum RendererBackend
     /// <summary>GeoConvert's dependency-free software rasterizer (<see cref="MapRenderer"/>).</summary>
     BuiltIn,
 
+    /// <summary>SkiaSharp-backed rasterizer (<see cref="SkiaRenderer"/>); labels use Skia's default typeface.</summary>
+    Skia,
+
     /// <summary>SixLabors.ImageSharp-backed rasterizer (<see cref="ImageSharpRenderer"/>); labels use a system font.</summary>
     ImageSharp,
 }

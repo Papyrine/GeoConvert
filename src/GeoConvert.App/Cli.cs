@@ -133,7 +133,7 @@ public static class Cli
 
                     if (!TryParseRenderer(rendererText, out var renderer))
                     {
-                        error.WriteLine("--renderer must be 'builtin' or 'imagesharp'.");
+                        error.WriteLine("--renderer must be 'builtin', 'skia', or 'imagesharp'.");
                         return 2;
                     }
 
@@ -366,6 +366,10 @@ public static class Cli
             case "default":
                 renderer = RendererBackend.BuiltIn;
                 return true;
+            case "skia":
+            case "skiasharp":
+                renderer = RendererBackend.Skia;
+                return true;
             case "imagesharp":
             case "image-sharp":
             case "sixlabors":
@@ -438,7 +442,7 @@ public static class Cli
               --size WIDTH[xHEIGHT]        Image size in pixels.
               --max-dimension <pixels>     Cap the longer edge at this many pixels (fit-to-box).
               --projection <name>          auto | plate-carree | web-mercator | lambert | goode.
-              --renderer <name>            builtin (default) or imagesharp (PNG only).
+              --renderer <name>            builtin (default), skia or imagesharp (PNG only).
 
             Examples:
               geoconvert-app world.geojson

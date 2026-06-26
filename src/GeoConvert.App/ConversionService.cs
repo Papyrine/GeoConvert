@@ -108,6 +108,7 @@ public static class ConversionService
         var options = RenderOptionsFor(render, progress);
         return render.Renderer switch
         {
+            RendererBackend.Skia => SkiaRenderer.RenderPng(features, options),
             RendererBackend.ImageSharp => ImageSharpRenderer.RenderPng(features, options),
             _ => MapRenderer.RenderPng(features, options),
         };

@@ -6,11 +6,9 @@
     Target hacks below let the project keep a *plain* TFM (net10.0 / net11.0, no '-windows' suffix) so it
     packs as an ordinary framework-dependent dotnet tool. Unlike MsOfficeDiff this stays inside
     GeoConvert's no-third-party-dependency discipline: argument parsing is hand-rolled (see Cli.cs) and
-    settings use System.Text.Json, so no CliFx / Serilog / DI packages are pulled in. The ImageSharp
-    render backend is referenced for parity with the geoconvert CLI's renderer flag; it (and only it)
-    carries a third-party dependency into the tool, exactly as the CLI already does. The Skia backend is
-    deliberately not referenced: it currently fails to build on main (obsolete SkiaSharp APIs vs
-    TreatWarningsAsErrors), so wiring it in would break this app's build through no fault of its own.
+    settings use System.Text.Json, so no CliFx / Serilog / DI packages are pulled in. The Skia and
+    ImageSharp render backends are referenced for parity with the geoconvert CLI's renderer flag; those
+    (and only those) carry third-party dependencies into the tool, exactly as the CLI already does.
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -47,8 +45,25 @@
     </PropertyGroup>
   </Target>
 
+  <!--
+    SkiaSharp 4.148 ships ~90 MB of native debug-symbol (.pdb) files plus native libs for every OS,
+    which balloons the packed tool past 180 MB. This is a Windows-only WinForms tool, so strip the
+    native symbols (never needed at runtime) and the non-Windows native libs from what gets packaged.
+    Brings the nupkg back to tens of MB. (The geoconvert CLI has the same latent bloat from the same
+    SkiaSharp bump.)
+  -->
+  <Target Name="TrimNativeAssets" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(Extension)' == '.pdb' and $([System.String]::Copy('%(RelativePath)').Contains('native'))" />
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="$([System.String]::Copy('%(RelativePath)').Replace('\', '/').Contains('runtimes/osx')) or $([System.String]::Copy('%(RelativePath)').Replace('\', '/').Contains('runtimes/linux'))" />
+    </ItemGroup>
+  </Target>
+
   <ItemGroup>
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
+    <ProjectReference Include="..\GeoConvert.Skia\GeoConvert.Skia.csproj" />
     <ProjectReference Include="..\GeoConvert.ImageSharp\GeoConvert.ImageSharp.csproj" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />

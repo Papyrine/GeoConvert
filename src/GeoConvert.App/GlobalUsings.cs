@@ -6,4 +6,5 @@ global using System.Text.Json;
 global using System.Text.Json.Serialization;
 global using GeoConvert;
 global using GeoConvert.ImageSharp;
+global using GeoConvert.Skia;
 global using Microsoft.Win32;

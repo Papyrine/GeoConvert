@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+
+  <!--
+    A WinForms GUI that is also shipped as a .NET tool. The packaging mirrors MsOfficeDiff
+    (https://github.com/SimonCropp/MsOfficeDiff): the WindowsDesktop SDK gives us WinForms, and the two
+    Target hacks below let the project keep a *plain* TFM (net10.0 / net11.0, no '-windows' suffix) so it
+    packs as an ordinary framework-dependent dotnet tool. Unlike MsOfficeDiff this stays inside
+    GeoConvert's no-third-party-dependency discipline: argument parsing is hand-rolled (see Cli.cs) and
+    settings use System.Text.Json, so no CliFx / Serilog / DI packages are pulled in. The ImageSharp
+    render backend is referenced for parity with the geoconvert CLI's renderer flag; it (and only it)
+    carries a third-party dependency into the tool, exactly as the CLI already does. The Skia backend is
+    deliberately not referenced: it currently fails to build on main (obsolete SkiaSharp APIs vs
+    TreatWarningsAsErrors), so wiring it in would break this app's build through no fault of its own.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);CA1416;NETSDK1137</NoWarn>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>geoconvert-app</ToolCommandName>
+    <RootNamespace>GeoConvert.App</RootNamespace>
+    <RollForward>LatestMajor</RollForward>
+    <!-- Match MsOfficeDiff's WinForms-tool template: a GUI tool ships no XML docs, and the tool's
+         dependencies must be copied locally so the packed tool runs standalone. -->
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <Description>A WinForms desktop app and .NET tool that converts maps between geospatial formats, renders them to PNG/SVG, and diffs two maps. Built on GeoConvert.</Description>
+    <PackageTags>geojson;shapefile;flatgeobuf;topojson;kml;kmz;gpx;wkt;wkb;gis;geospatial;conversion;winforms;diff</PackageTags>
+    <PackageReadmeFile>readme.md</PackageReadmeFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="nuget-readme.md" Pack="true" PackagePath="\readme.md" Visible="false" />
+  </ItemGroup>
+
+  <Target Name="RemoveTargetPlatformIdentifier" BeforeTargets="_CheckForInvalidWindowsDesktopTargetingConfiguration">
+    <PropertyGroup>
+      <TargetPlatformIdentifier>Windows</TargetPlatformIdentifier>
+    </PropertyGroup>
+  </Target>
+  <Target Name="RestoreTargetPlatformIdentifier" AfterTargets="_CheckForInvalidWindowsDesktopTargetingConfiguration">
+    <PropertyGroup>
+      <TargetPlatformIdentifier></TargetPlatformIdentifier>
+    </PropertyGroup>
+  </Target>
+
+  <ItemGroup>
+    <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
+    <ProjectReference Include="..\GeoConvert.ImageSharp\GeoConvert.ImageSharp.csproj" />
+    <PackageReference Include="Polyfill" PrivateAssets="all" />
+    <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
+  </ItemGroup>
+
+</Project>

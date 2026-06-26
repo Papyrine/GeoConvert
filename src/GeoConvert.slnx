@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="GeoConvert/GeoConvert.csproj" />
+  <Project Path="GeoConvert.App/GeoConvert.App.csproj" />
   <Project Path="GeoConvert.Cli/GeoConvert.Cli.csproj" />
   <Project Path="GeoConvert.ImageSharp/GeoConvert.ImageSharp.csproj" />
   <Project Path="GeoConvert.Skia/GeoConvert.Skia.csproj" />

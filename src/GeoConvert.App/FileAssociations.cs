@@ -8,11 +8,11 @@ namespace GeoConvert.App;
 /// </summary>
 public static class FileAssociations
 {
-    const string ProgId = "GeoConvert.Map";
-    const string ProgIdLabel = "GeoConvert Map";
+    const string progId = "GeoConvert.Map";
+    const string progIdLabel = "GeoConvert Map";
 
-    const int ShcneAssocchanged = 0x08000000;
-    const uint ShcnfIdlist = 0;
+    const int shcneAssocchanged = 0x08000000;
+    const uint shcnfIdlist = 0;
 
     [DllImport("shell32.dll")]
     static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
@@ -28,7 +28,7 @@ public static class FileAssociations
     public static bool IsAssociated()
     {
         using var classes = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{Extensions[0]}");
-        return classes?.GetValue(null) as string == ProgId;
+        return classes?.GetValue(null) as string == progId;
     }
 
     /// <summary>Binds every supported map extension to this app.</summary>
@@ -36,9 +36,9 @@ public static class FileAssociations
     {
         var executable = ExecutablePath;
 
-        using (var progId = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{ProgId}"))
+        using (var progId = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{FileAssociations.progId}"))
         {
-            progId.SetValue(null, ProgIdLabel);
+            progId.SetValue(null, progIdLabel);
             using (var icon = progId.CreateSubKey("DefaultIcon"))
             {
                 icon.SetValue(null, $"\"{executable}\",0");
@@ -53,9 +53,9 @@ public static class FileAssociations
             using var key = Registry.CurrentUser.CreateSubKey($@"Software\Classes\{extension}");
             // Set as the default handler (the "bind" the user asked for) and also advertise the ProgId in
             // the extension's OpenWith list so the app shows up there and the binding is cleanly removable.
-            key.SetValue(null, ProgId);
+            key.SetValue(null, progId);
             using var openWith = key.CreateSubKey("OpenWithProgids");
-            openWith.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+            openWith.SetValue(progId, Array.Empty<byte>(), RegistryValueKind.None);
         }
 
         NotifyShell();
@@ -74,21 +74,21 @@ public static class FileAssociations
 
             // Only clear the default if it still points at us — never stomp a handler the user has since
             // chosen.
-            if (key.GetValue(null) as string == ProgId)
+            if (key.GetValue(null) as string == progId)
             {
                 // "" is the name of a key's default value (DeleteValue, unlike GetValue, won't take null).
                 key.DeleteValue(string.Empty, throwOnMissingValue: false);
             }
 
             using var openWith = key.OpenSubKey("OpenWithProgids", writable: true);
-            openWith?.DeleteValue(ProgId, throwOnMissingValue: false);
+            openWith?.DeleteValue(progId, throwOnMissingValue: false);
         }
 
-        Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\{ProgId}", throwOnMissingSubKey: false);
+        Registry.CurrentUser.DeleteSubKeyTree($@"Software\Classes\{progId}", throwOnMissingSubKey: false);
         NotifyShell();
     }
 
     static void NotifyShell() =>
         // Tell Explorer the associations changed so icons / "Open with" refresh without a sign-out.
-        SHChangeNotify(ShcneAssocchanged, ShcnfIdlist, IntPtr.Zero, IntPtr.Zero);
+        SHChangeNotify(shcneAssocchanged, shcnfIdlist, IntPtr.Zero, IntPtr.Zero);
 }

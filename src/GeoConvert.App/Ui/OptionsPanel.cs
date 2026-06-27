@@ -20,6 +20,7 @@ sealed class OptionsPanel : FlowLayoutPanel
     GroupBox kmzSection = null!;
     GroupBox parquetSection = null!;
     GroupBox noteSection = null!;
+    ComboBox outputCombo = null!;
 
     TableLayoutPanel currentTable = null!;
 
@@ -63,7 +64,7 @@ sealed class OptionsPanel : FlowLayoutPanel
     void BuildOutputSection()
     {
         BeginSection("Output");
-        AddCombo(
+        outputCombo = AddCombo(
             "Format",
             [.. ConversionService.WritableFormats.Select(_ => (_.Format, _.DisplayName))],
             SelectedFormat,
@@ -74,6 +75,9 @@ sealed class OptionsPanel : FlowLayoutPanel
                 TargetChanged?.Invoke(this, EventArgs.Empty);
             });
     }
+
+    /// <summary>Selects the output format programmatically, exactly as choosing it in the combo would.</summary>
+    internal void SelectFormat(GeoFormat format) => Combos.Select(outputCombo, format);
 
     void BuildImageSection()
     {
@@ -212,7 +216,7 @@ sealed class OptionsPanel : FlowLayoutPanel
         currentTable.Controls.Add(control);
     }
 
-    void AddCombo<T>(string label, IReadOnlyList<(T Value, string Label)> choices, T current, Action<T> set, bool affectsPreview = true)
+    ComboBox AddCombo<T>(string label, IReadOnlyList<(T Value, string Label)> choices, T current, Action<T> set, bool affectsPreview = true)
         where T : notnull
     {
         var combo = Combos.Build(
@@ -228,6 +232,7 @@ sealed class OptionsPanel : FlowLayoutPanel
             });
         combo.Width = 190;
         Row(label, combo);
+        return combo;
     }
 
     void AddInt(string label, int min, int max, int current, Action<int> set, bool affectsPreview = true)

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- A '-windows' TFM (plus UseWindowsForms) so WinForms and Verify.WinForms are available; the app
+         it tests is referenced at its net11.0 build. Test projects don't pack, so no tool-packaging hack
+         is needed here (unlike the app itself). -->
+    <TargetFramework>net11.0-windows</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <UseWindowsForms>true</UseWindowsForms>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <!-- WinForms snapshot tests are Windows-only by nature, like the app they test (which also NoWarns
+         this). Suppresses the platform-compatibility analyzer for the WinForms calls. -->
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ProjectFiles" />
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="Verify.TUnit" />
+    <PackageReference Include="Verify.WinForms" />
+    <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
+    <ProjectReference Include="..\GeoConvert.App\GeoConvert.App.csproj" />
+  </ItemGroup>
+
+</Project>

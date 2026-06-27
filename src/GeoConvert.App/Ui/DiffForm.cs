@@ -73,18 +73,18 @@ sealed class DiffForm : Form
         Size = new(1100, 720);
         MinimumSize = new(820, 520);
 
-        split = new SplitContainer
+        split = new()
         {
             Dock = DockStyle.Fill,
             FixedPanel = FixedPanel.Panel2,
         };
-        preview = new PictureBox
+        preview = new()
         {
             Dock = DockStyle.Fill,
             SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.FromArgb(245, 245, 245),
         };
-        summary = new TextBox
+        summary = new()
         {
             Dock = DockStyle.Fill,
             Multiline = true,
@@ -97,7 +97,7 @@ sealed class DiffForm : Form
         split.Panel1.Controls.Add(preview);
         split.Panel2.Controls.Add(summary);
 
-        saveButton = new Button
+        saveButton = new()
         {
             Dock = DockStyle.Bottom,
             Height = 38,
@@ -258,11 +258,13 @@ sealed class DiffForm : Form
             {
                 mapA = collection;
                 pathA = path;
+                pathBoxA.Text = path;
             }
             else
             {
                 mapB = collection;
                 pathB = path;
+                pathBoxB.Text = path;
             }
 
             if (render)

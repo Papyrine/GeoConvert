@@ -1,0 +1,19 @@
+﻿Map A: a.geojson
+  Features:   3
+  Layers:     1
+  Bounds:     0, 0 .. 20, 12
+  Geometry:   Polygon 2, LineString 1
+  Properties: name, pop
+
+Map B: b.geojson
+  Features:   2
+  Layers:     1
+  Bounds:     1, 1 .. 16, 11
+  Geometry:   Polygon 1, Point 1
+  Properties: iso, name, pop
+
+Differences:
+  Features:   -1
+  Geometry:   LineString -1, Point +1, Polygon -1
+  Properties only in A: (none)
+  Properties only in B: iso

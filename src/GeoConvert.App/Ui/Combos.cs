@@ -30,6 +30,20 @@ static class Combos
         return combo;
     }
 
+    /// <summary>Selects the item carrying <paramref name="value"/>, raising the change handler as a user pick would.</summary>
+    public static void Select<T>(ComboBox combo, T value)
+        where T : notnull
+    {
+        for (var index = 0; index < combo.Items.Count; index++)
+        {
+            if (combo.Items[index] is Choice<T> choice && EqualityComparer<T>.Default.Equals(choice.Value, value))
+            {
+                combo.SelectedIndex = index;
+                return;
+            }
+        }
+    }
+
     sealed class Choice<T>(T value, string label)
     {
         public T Value { get; } = value;

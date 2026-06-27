@@ -50,7 +50,7 @@ public class RenderBackendTests
         try
         {
             MapRenderer.PaintSurface(
-                [new FeatureCollection()],
+                [new()],
                 new(),
                 (width, height) =>
                 {

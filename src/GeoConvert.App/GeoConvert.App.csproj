@@ -58,12 +58,27 @@
     </ItemGroup>
   </Target>
 
+  <!--
+    Bundle the same sample world map the Blazor app uses: country borders, topology-simplified at
+    tolerance 0.1. MapBundle stages the result as maps/World/borders.fgb beside the app at build time
+    (its default "maps/<Region>" layout); the "Load sample map" menu item reads it at runtime. Same
+    knobs as GeoConvert.Web.csproj, minus the wwwroot output override.
+  -->
+  <PropertyGroup>
+    <MapBundleLayers>Borders</MapBundleLayers>
+    <MapBundleSimplifyTolerance>0.1</MapBundleSimplifyTolerance>
+  </PropertyGroup>
+
   <ItemGroup>
+    <PackageReference Include="MapBundle.World" PrivateAssets="all" />
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
     <ProjectReference Include="..\GeoConvert.Skia\GeoConvert.Skia.csproj" />
     <ProjectReference Include="..\GeoConvert.ImageSharp\GeoConvert.ImageSharp.csproj" />
     <PackageReference Include="Polyfill" PrivateAssets="all" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
+    <!-- The Forms and other UI types are internal; the test project (signed with the same src/key.snk)
+         snapshots them via Verify.WinForms. Same public key as the library's IVT entries. -->
+    <InternalsVisibleTo Include="GeoConvert.App.Tests" Key="002400000480000014010000060200000024000052534131000800000100010005bbb86c9b02a0b0849243e7d9118673c785041d0b2f5b620b05ffc784da615212820395b3c10c97897a1514fd9ce5836d77babd7e0542b295b376f89d422cd0268e04b3a3846741e25dc1508b020c7f200ee16ab0824d8753cd0d127b3c4e14f2187c72287b8fc363b769e9e285ab1e330bd684d74d0adfc8895423665d79dadc8025415699ddcc053c93670583508fd55d4a99588f6ebc12e7ba66ae2d210fe1e711c8a546d229dd321ac841223fac8030b66d6ef28ae6256af845cf724c00d4c1e60bbd919919aaca03edcd16dda18b3218d792f8808db46ea221bb4ffb78c7701a6b16492df581f83e13150c2ac0d82b57d79ff9e61dd47d902eda39b6f1" />
   </ItemGroup>
 
 </Project>

@@ -139,7 +139,7 @@ public class ExportOptionsTests : BunitTestContext
     {
         var cut = Render<ExportOptions>(_ => _
             .Add(component => component.Target, GeoFormat.GeoParquet)
-            .Add(component => component.Parquet, new GeoParquetSettings()));
+            .Add(component => component.Parquet, new()));
 
         // Snappy (the default) ignores the deflate level, so the GZIP-level control is hidden.
         await Assert.That(cut.FindAll("#parquet-gzip").Count).IsEqualTo(0);

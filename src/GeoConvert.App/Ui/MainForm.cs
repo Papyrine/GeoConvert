@@ -18,7 +18,6 @@ sealed class MainForm : Form
     PictureBox preview = null!;
     Button saveButton = null!;
     Label fileLabel = null!;
-    SplitContainer split = null!;
     ToolStripStatusLabel statusLabel = null!;
     ToolStripProgressBar progressBar = null!;
 
@@ -28,6 +27,10 @@ sealed class MainForm : Form
     string? initialFile;
     int previewToken;
     bool busy;
+
+    // Fixed width, in pixels, of the right-hand options column (wide enough for the 372px option groups
+    // plus the scrollbar, so no horizontal scroll appears).
+    const int optionsWidth = 420;
 
     public MainForm(SettingsManager settingsManager, string? initialFile)
     {
@@ -60,19 +63,13 @@ sealed class MainForm : Form
         Size = new(1100, 720);
         MinimumSize = new(820, 520);
 
-        split = new SplitContainer
-        {
-            Dock = DockStyle.Fill,
-            FixedPanel = FixedPanel.Panel2,
-        };
-
-        preview = new PictureBox
+        preview = new()
         {
             Dock = DockStyle.Fill,
             SizeMode = PictureBoxSizeMode.Zoom,
             BackColor = Color.FromArgb(245, 245, 245),
         };
-        fileLabel = new Label
+        fileLabel = new()
         {
             Dock = DockStyle.Top,
             AutoSize = false,
@@ -81,14 +78,21 @@ sealed class MainForm : Form
             Padding = new(8, 0, 0, 0),
             Text = "No map loaded",
         };
-        split.Panel1.Controls.Add(preview);
-        split.Panel1.Controls.Add(fileLabel);
+        var previewHost = new Panel
+        {
+            Dock = DockStyle.Fill
+        };
+        previewHost.Controls.Add(preview);
+        previewHost.Controls.Add(fileLabel);
 
-        optionsPanel = new(render, simplify, kmz, parquet) { Dock = DockStyle.Fill };
+        optionsPanel = new(render, simplify, kmz, parquet)
+        {
+            Dock = DockStyle.Fill
+        };
         optionsPanel.Changed += (_, _) => _ = RefreshPreviewAsync();
         optionsPanel.TargetChanged += (_, _) => UpdateSaveLabel();
 
-        saveButton = new Button
+        saveButton = new()
         {
             Dock = DockStyle.Bottom,
             Height = 40,
@@ -96,24 +100,38 @@ sealed class MainForm : Form
             Enabled = false,
         };
         saveButton.Click += (_, _) => _ = SaveAsync();
-        split.Panel2.Controls.Add(optionsPanel);
-        split.Panel2.Controls.Add(saveButton);
+
+        // The options live in a fixed-width column pinned to the right edge — a plain docked panel, not a
+        // SplitContainer, so there is no draggable splitter and the column never grows or shrinks with the
+        // window. The preview takes all the remaining width.
+        var optionsHost = new Panel
+        {
+            Dock = DockStyle.Right,
+            Width = optionsWidth
+        };
+        optionsHost.Controls.Add(optionsPanel);
+        optionsHost.Controls.Add(saveButton);
 
         var status = new StatusStrip();
-        statusLabel = new ToolStripStatusLabel { Spring = true, TextAlign = ContentAlignment.MiddleLeft };
-        progressBar = new ToolStripProgressBar { Visible = false, Width = 200 };
+        statusLabel = new()
+        {
+            Spring = true,
+            TextAlign = ContentAlignment.MiddleLeft
+        };
+        progressBar = new()
+        {
+            Visible = false,
+            Width = 200
+        };
         status.Items.Add(statusLabel);
         status.Items.Add(progressBar);
 
-        Controls.Add(split);
+        // Add the fill host first so it claims the leftover area; the menu and status (added last) span the
+        // full width top and bottom, with the fixed options column between them on the right.
+        Controls.Add(previewHost);
+        Controls.Add(optionsHost);
         Controls.Add(status);
         Controls.Add(BuildMenu());
-    }
-
-    protected override void OnLoad(EventArgs args)
-    {
-        base.OnLoad(args);
-        SplitLayout.ConfigureSplit(split, 400);
     }
 
     MenuStrip BuildMenu()
@@ -122,6 +140,7 @@ sealed class MainForm : Form
 
         var file = new ToolStripMenuItem("&File");
         file.DropDownItems.Add("&Open…", null, (_, _) => OpenFile());
+        file.DropDownItems.Add("&Load sample world map", null, (_, _) => OpenSample());
         file.DropDownItems.Add("&Save As…", null, (_, _) => _ = SaveAsync());
         file.DropDownItems.Add(new ToolStripSeparator());
         file.DropDownItems.Add("E&xit", null, (_, _) => Close());
@@ -154,10 +173,21 @@ sealed class MainForm : Form
         }
     }
 
+    void OpenSample()
+    {
+        if (SampleMap.Locate() is { } path)
+        {
+            _ = LoadAsync(path);
+            return;
+        }
+
+        MessageBox.Show(this, "The bundled sample world map isn't available next to the app.", "GeoConvert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+    }
+
     async Task LoadAsync(string path)
     {
         var detected = ConversionService.Detect(path);
-        if (detected is not { CanRead: true })
+        if (detected is not {CanRead: true})
         {
             MessageBox.Show(this, $"Can't read '{Path.GetFileName(path)}': unsupported map format.", "GeoConvert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
@@ -187,7 +217,7 @@ sealed class MainForm : Form
 
     async Task RefreshPreviewAsync()
     {
-        if (features is not { Count: > 0 } collection)
+        if (features is not {Count: > 0} collection)
         {
             preview.Image?.Dispose();
             preview.Image = null;
@@ -307,7 +337,7 @@ sealed class MainForm : Form
 
     void UpdateState()
     {
-        saveButton.Enabled = features is { Count: > 0 } && !busy;
+        saveButton.Enabled = features is {Count: > 0} && !busy;
         UpdateSaveLabel();
     }
 
@@ -332,7 +362,7 @@ sealed class MainForm : Form
             statusLabel.Text = message;
         }
 
-        saveButton.Enabled = features is { Count: > 0 } && !busy;
+        saveButton.Enabled = features is {Count: > 0} && !busy;
         Cursor = value ? Cursors.AppStarting : Cursors.Default;
     }
 

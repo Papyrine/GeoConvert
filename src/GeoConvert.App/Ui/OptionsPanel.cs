@@ -141,7 +141,12 @@ sealed class OptionsPanel : FlowLayoutPanel
     void BuildSimplifySection()
     {
         BeginSection("Simplify (optional pre-pass)");
-        AddCheck("Simplify geometry", simplify.Enabled, _ => simplify.Enabled = _);
+        var enabled = AddCheck("Simplify geometry", simplify.Enabled, _ => simplify.Enabled = _);
+
+        // The tolerance / method / topology options only apply when simplification is on, so collapse
+        // them when "Simplify geometry" is unchecked. Capture the controls added below so the toggle can
+        // hide both the labels and the inputs (an AutoSize TableLayoutPanel row collapses when empty).
+        var dependentStart = currentTable.Controls.Count;
         AddDouble("Tolerance", 0, 1000, 4, simplify.Tolerance, _ => simplify.Tolerance = _);
         AddCombo(
             "Method",
@@ -149,6 +154,23 @@ sealed class OptionsPanel : FlowLayoutPanel
             simplify.Method,
             _ => simplify.Method = _);
         AddCheck("Preserve shared boundaries", simplify.Topology, _ => simplify.Topology = _);
+
+        var dependents = new List<Control>();
+        for (var index = dependentStart; index < currentTable.Controls.Count; index++)
+        {
+            dependents.Add(currentTable.Controls[index]);
+        }
+
+        void Sync()
+        {
+            foreach (var dependent in dependents)
+            {
+                dependent.Visible = enabled.Checked;
+            }
+        }
+
+        enabled.CheckedChanged += (_, _) => Sync();
+        Sync();
     }
 
     void BuildNoteSection()
@@ -212,15 +234,18 @@ sealed class OptionsPanel : FlowLayoutPanel
 
     void Row(string label, Control control)
     {
+        // Fill the label cell and centre its text vertically so it lines up with the input regardless of
+        // the input's height; centre the input in the row too (Anchor without Top/Bottom). The column is
+        // wide enough (215px) that no label wraps.
         var caption = new Label
         {
             Text = label,
-            AutoSize = true,
-            Anchor = AnchorStyles.Left,
-            Margin = new(3, 7, 3, 3),
-            MaximumSize = new(210, 0),
+            Dock = DockStyle.Fill,
+            TextAlign = ContentAlignment.MiddleLeft,
+            Margin = new(3, 0, 3, 0),
         };
         currentTable.Controls.Add(caption);
+        control.Anchor = AnchorStyles.Left;
         currentTable.Controls.Add(control);
     }
 
@@ -329,7 +354,7 @@ sealed class OptionsPanel : FlowLayoutPanel
         Row(label, numeric);
     }
 
-    void AddCheck(string label, bool current, Action<bool> set, bool affectsPreview = true)
+    CheckBox AddCheck(string label, bool current, Action<bool> set, bool affectsPreview = true)
     {
         var check = new CheckBox
         {
@@ -346,6 +371,7 @@ sealed class OptionsPanel : FlowLayoutPanel
             }
         };
         Row(label, check);
+        return check;
     }
 
     void AddText(string label, string current, Action<string?> set, bool affectsPreview = true)

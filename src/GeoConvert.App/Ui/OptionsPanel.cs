@@ -36,6 +36,7 @@ sealed class OptionsPanel : FlowLayoutPanel
         AutoScroll = true;
         Padding = new(4);
 
+        BuildProjectionSection();
         BuildOutputSection();
         BuildImageSection();
         BuildPngSection();
@@ -61,6 +62,14 @@ sealed class OptionsPanel : FlowLayoutPanel
 
     // --- sections ---
 
+    void BuildProjectionSection()
+    {
+        // Above Output and always shown: the projection drives the live preview too, not just the
+        // PNG/SVG export, so it stays available whatever the chosen output format.
+        BeginSection("Projection");
+        AddRadioGroup(OptionChoices.Projections, render.Projection, _ => render.Projection = _);
+    }
+
     void BuildOutputSection()
     {
         BeginSection("Output");
@@ -82,7 +91,6 @@ sealed class OptionsPanel : FlowLayoutPanel
     void BuildImageSection()
     {
         imageSection = BeginSection("Image (PNG / SVG)");
-        AddCombo("Projection", OptionChoices.Projections, render.Projection, _ => render.Projection = _);
         AddCombo("Resolution", OptionChoices.Dimensions, render.MaxDimension, _ => render.MaxDimension = _);
         AddInt("Padding (px)", 0, 500, render.Padding, _ => render.Padding = _);
         AddInt("Stroke width (px)", 0, 50, render.StrokeWidth, _ => render.StrokeWidth = _);
@@ -149,7 +157,7 @@ sealed class OptionsPanel : FlowLayoutPanel
         var note = new Label
         {
             AutoSize = true,
-            MaximumSize = new(330, 0),
+            MaximumSize = new(400, 0),
             Margin = new(3),
             Text = "This format writes geometry and properties directly. Use the Simplify section above to thin vertices before writing.",
         };
@@ -180,7 +188,7 @@ sealed class OptionsPanel : FlowLayoutPanel
             Dock = DockStyle.Top,
             Padding = new(4),
         };
-        table.ColumnStyles.Add(new(SizeType.Absolute, 150));
+        table.ColumnStyles.Add(new(SizeType.Absolute, 215));
         table.ColumnStyles.Add(new(SizeType.Absolute, 200));
 
         var box = new GroupBox
@@ -191,8 +199,8 @@ sealed class OptionsPanel : FlowLayoutPanel
             // Pin the width (Min == Max), leaving only the height to AutoSize. Without this an AutoSize
             // GroupBox wrapping a Dock=Top table can't resolve its width (each defers to the other) and
             // collapses to a sliver.
-            MinimumSize = new(372, 0),
-            MaximumSize = new(372, 0),
+            MinimumSize = new(440, 0),
+            MaximumSize = new(440, 0),
             Margin = new(3),
             Padding = new(6, 3, 6, 6),
         };
@@ -210,10 +218,52 @@ sealed class OptionsPanel : FlowLayoutPanel
             AutoSize = true,
             Anchor = AnchorStyles.Left,
             Margin = new(3, 7, 3, 3),
-            MaximumSize = new(145, 0),
+            MaximumSize = new(210, 0),
         };
         currentTable.Controls.Add(caption);
         currentTable.Controls.Add(control);
+    }
+
+    // A full-width column of mutually-exclusive radio buttons (one container => one radio group). Used
+    // where a choice reads better laid out than hidden in a dropdown — e.g. the projection.
+    void AddRadioGroup<T>(IReadOnlyList<(T Value, string Label)> choices, T current, Action<T> set, bool affectsPreview = true)
+        where T : notnull
+    {
+        var group = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Margin = new(3),
+        };
+        foreach (var (value, text) in choices)
+        {
+            var radio = new RadioButton
+            {
+                Text = text,
+                AutoSize = true,
+                Checked = EqualityComparer<T>.Default.Equals(value, current),
+                Margin = new(0, 1, 0, 1),
+            };
+            radio.CheckedChanged += (_, _) =>
+            {
+                if (!radio.Checked)
+                {
+                    return;
+                }
+
+                set(value);
+                if (affectsPreview)
+                {
+                    RaiseChanged();
+                }
+            };
+            group.Controls.Add(radio);
+        }
+
+        currentTable.Controls.Add(group);
+        currentTable.SetColumnSpan(group, 2);
     }
 
     ComboBox AddCombo<T>(string label, IReadOnlyList<(T Value, string Label)> choices, T current, Action<T> set, bool affectsPreview = true)

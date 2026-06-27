@@ -2,7 +2,13 @@ namespace GeoConvert.App;
 
 static class Program
 {
-    static readonly SettingsManager settingsManager = new(SettingsManager.DefaultSettingsPath);
+    // The GEOCONVERT_SETTINGS environment variable overrides where settings live — used by tests and
+    // screenshot tooling so they never touch the real per-user settings file (which gates the one-time
+    // association prompt).
+    static readonly SettingsManager settingsManager = new(
+        Environment.GetEnvironmentVariable("GEOCONVERT_SETTINGS") is { Length: > 0 } path
+            ? path
+            : SettingsManager.DefaultSettingsPath);
 
     [STAThread]
     static int Main(string[] args)

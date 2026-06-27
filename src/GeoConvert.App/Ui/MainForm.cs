@@ -28,9 +28,9 @@ sealed class MainForm : Form
     int previewToken;
     bool busy;
 
-    // Fixed width, in pixels, of the right-hand options column (wide enough for the 372px option groups
+    // Fixed width, in pixels, of the right-hand options column (wide enough for the 440px option groups
     // plus the scrollbar, so no horizontal scroll appears).
-    const int optionsWidth = 420;
+    const int optionsWidth = 480;
 
     public MainForm(SettingsManager settingsManager, string? initialFile)
     {

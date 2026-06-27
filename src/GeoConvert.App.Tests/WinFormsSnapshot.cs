@@ -6,12 +6,18 @@ namespace GeoConvert.App.Tests;
 /// thread-agnostic and handed back. Forms are briefly shown off-screen so their <c>OnLoad</c> (e.g. the
 /// diff window's splitter layout) runs before the draw; plain controls just get a handle and a layout
 /// pass. Nothing is verified here — the caller passes the bitmap to Verify.
+/// <para>
+/// A <c>scale</c> &gt; 1 simulates a higher display DPI: WinForms applies DPI scaling through
+/// <see cref="Control.Scale(SizeF)"/>, so calling it directly reproduces the same scaling behaviour
+/// (including the class of bug where fixed-pixel sizes don't scale while font-sized controls do) without
+/// needing an actual high-DPI monitor. scale 1.25 == 120 DPI / 125%, scale 1.5 == 144 DPI / 150%.
+/// </para>
 /// </summary>
 static class WinFormsSnapshot
 {
     static bool stylesEnabled;
 
-    public static Bitmap Render(Func<Control> factory, int width, int height)
+    public static Bitmap Render(Func<Control> factory, int width, int height, float scale = 1f)
     {
         Bitmap? result = null;
         Exception? failure = null;
@@ -29,7 +35,13 @@ static class WinFormsSnapshot
                     form.StartPosition = FormStartPosition.Manual;
                     form.ShowInTaskbar = false;
                     form.Location = new(-5000, -5000);
-                    form.Size = new(width, height);
+                    // An AutoSize form sizes itself to its content — forcing a size would clip it.
+                    if (!form.AutoSize)
+                    {
+                        form.Size = new(width, height);
+                    }
+
+                    Rescale(form, scale);
                     form.Show();
                     Application.DoEvents();
                     result = Draw(form);
@@ -39,6 +51,7 @@ static class WinFormsSnapshot
                 {
                     control.Size = new(width, height);
                     _ = control.Handle;
+                    Rescale(control, scale);
                     control.PerformLayout();
                     Application.DoEvents();
                     result = Draw(control);
@@ -60,6 +73,14 @@ static class WinFormsSnapshot
         }
 
         return result!;
+    }
+
+    static void Rescale(Control control, float scale)
+    {
+        if (scale != 1f)
+        {
+            control.Scale(new SizeF(scale, scale));
+        }
     }
 
     static Bitmap Draw(Control control)

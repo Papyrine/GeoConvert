@@ -167,52 +167,74 @@ sealed class DiffForm : Form
         return box;
     }
 
-    FlowLayoutPanel BuildToolbar()
+    TableLayoutPanel BuildToolbar()
     {
-        var bar = new FlowLayoutPanel
+        // A single-row TableLayoutPanel (not a FlowLayoutPanel) so each item anchors left and the cell
+        // centres it vertically — labels line up with the combos at any DPI. A FlowLayoutPanel top-aligns
+        // its children, which needed hand-tuned top margins that drifted once the controls scaled.
+        var bar = new TableLayoutPanel
         {
             Dock = DockStyle.Top,
             AutoSize = true,
-            WrapContents = false,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            ColumnCount = 10,
+            RowCount = 1,
             Padding = new(6, 2, 6, 2),
         };
+        for (var column = 0; column < bar.ColumnCount; column++)
+        {
+            bar.ColumnStyles.Add(new(SizeType.AutoSize));
+        }
 
-        bar.Controls.Add(new Label { Text = "Mode", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(3, 8, 3, 3) });
-        bar.Controls.Add(Combos.Build(
-            [(DiffMode.Overlay, "Overlay"), (DiffMode.SideBySide, "Side by side")],
-            mode,
-            value =>
-            {
-                mode = value;
-                _ = RenderAsync();
-            }));
+        void Add(Control control, int gapLeft)
+        {
+            control.Anchor = AnchorStyles.Left;
+            control.Margin = new(gapLeft, 3, 3, 3);
+            bar.Controls.Add(control);
+        }
 
-        bar.Controls.Add(new Label { Text = "Projection", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(8, 8, 3, 3) });
-        bar.Controls.Add(Combos.Build(
-            OptionChoices.Projections,
-            settings.Projection,
-            value =>
-            {
-                settings.Projection = value;
-                _ = RenderAsync();
-            }));
+        Add(new Label { Text = "Mode", AutoSize = true }, 3);
+        Add(
+            Combos.Build(
+                [(DiffMode.Overlay, "Overlay"), (DiffMode.SideBySide, "Side by side")],
+                mode,
+                value =>
+                {
+                    mode = value;
+                    _ = RenderAsync();
+                }),
+            0);
 
-        bar.Controls.Add(new Label { Text = "Resolution", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(8, 8, 3, 3) });
-        bar.Controls.Add(Combos.Build(
-            OptionChoices.Dimensions,
-            settings.MaxDimension > 0 ? settings.MaxDimension : 2048,
-            value =>
-            {
-                settings.MaxDimension = value;
-                _ = RenderAsync();
-            }));
+        Add(new Label { Text = "Projection", AutoSize = true }, 10);
+        Add(
+            Combos.Build(
+                OptionChoices.Projections,
+                settings.Projection,
+                value =>
+                {
+                    settings.Projection = value;
+                    _ = RenderAsync();
+                }),
+            0);
 
-        bar.Controls.Add(new Label { Text = "A", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(8, 8, 1, 3) });
+        Add(new Label { Text = "Resolution", AutoSize = true }, 10);
+        Add(
+            Combos.Build(
+                OptionChoices.Dimensions,
+                settings.MaxDimension > 0 ? settings.MaxDimension : 2048,
+                value =>
+                {
+                    settings.MaxDimension = value;
+                    _ = RenderAsync();
+                }),
+            0);
+
+        Add(new Label { Text = "A", AutoSize = true }, 10);
         swatchA = ColorSwatch(() => colorA, _ => colorA = _);
-        bar.Controls.Add(swatchA);
-        bar.Controls.Add(new Label { Text = "B", AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(8, 8, 1, 3) });
+        Add(swatchA, 1);
+        Add(new Label { Text = "B", AutoSize = true }, 8);
         swatchB = ColorSwatch(() => colorB, _ => colorB = _);
-        bar.Controls.Add(swatchB);
+        Add(swatchB, 1);
 
         return bar;
     }

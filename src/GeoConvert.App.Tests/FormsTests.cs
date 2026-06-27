@@ -3,17 +3,33 @@ namespace GeoConvert.App.Tests;
 [NotInParallel]
 public class FormsTests
 {
+    // Each window is snapshotted at 100% and 150% scale so DPI-only layout breaks (fixed-pixel sizes that
+    // don't scale with the font, as the diff window's input rows once did) are caught.
     [Test]
-    public Task MainWindow() =>
+    [Arguments(100)]
+    [Arguments(150)]
+    public Task MainWindow(int dpiPercent) =>
         // The whole main window: menu, the "no map loaded" bar, the (empty) preview and the fixed-width
         // options column on the right.
-        Verify(WinFormsSnapshot.Render(() => new MainForm(SeededSettings(), null), 1000, 680));
+        Verify(WinFormsSnapshot.Render(() => new MainForm(SeededSettings(), null), 1000, 680, dpiPercent / 100f))
+            .UseParameters(dpiPercent);
 
     [Test]
-    public Task DiffWindow() =>
+    [Arguments(100)]
+    [Arguments(150)]
+    public Task DiffWindow(int dpiPercent) =>
         // The empty compare window: the two file pickers, the mode/projection/colour toolbar, and the
         // (empty) preview / summary panes.
-        Verify(WinFormsSnapshot.Render(() => new DiffForm(), 1000, 680));
+        Verify(WinFormsSnapshot.Render(() => new DiffForm(), 1000, 680, dpiPercent / 100f))
+            .UseParameters(dpiPercent);
+
+    [Test]
+    [Arguments(100)]
+    [Arguments(150)]
+    public Task About(int dpiPercent) =>
+        // The (auto-sizing) About dialog: title, description, the clickable project link and OK button.
+        Verify(WinFormsSnapshot.Render(() => new AboutForm(), 420, 220, dpiPercent / 100f))
+            .UseParameters(dpiPercent);
 
     static SettingsManager SeededSettings()
     {

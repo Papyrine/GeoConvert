@@ -320,20 +320,12 @@ sealed class MainForm : Form
         }
     }
 
-    void ShowAbout() =>
-        MessageBox.Show(
-            this,
-            """
-            GeoConvert
-
-            Convert maps between GeoJSON, TopoJSON, Shapefile, FlatGeobuf, KML/KMZ, GPX, WKT, WKB, CSV and
-            GeoParquet; render to PNG/SVG; and compare two maps.
-
-            Tools ▸ Compare maps… diffs two files. From a terminal: geoconvert-app --help.
-            """,
-            "About GeoConvert",
-            MessageBoxButtons.OK,
-            MessageBoxIcon.Information);
+    void ShowAbout()
+    {
+        // A custom form (not a MessageBox) so the dialog is silent and can show a clickable project link.
+        using var about = new AboutForm();
+        about.ShowDialog(this);
+    }
 
     void UpdateState()
     {

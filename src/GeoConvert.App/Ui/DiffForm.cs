@@ -141,9 +141,10 @@ sealed class DiffForm : Form
 
     TextBox AddInputRow(TableLayoutPanel table, string label, string? value, Action<string> onPicked)
     {
-        // Anchor (not Dock) so each control keeps its natural height and the TableLayoutPanel centres it
-        // vertically in the row — Dock=Fill here stretched the controls and overlapped the toolbar below.
-        table.Controls.Add(new Label { Text = label, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new(3, 0, 3, 0) });
+        // The label fills its fixed-height cell and centres its text vertically (MiddleLeft), so it lines
+        // up with the text box. The box and button anchor left+right at their natural height and the
+        // TableLayoutPanel centres them in the row.
+        table.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new(3, 0, 3, 0) });
         var box = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true, Text = value ?? string.Empty, Margin = new(3, 0, 3, 0) };
         table.Controls.Add(box);
         var browse = new Button { Text = "Browse…", Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new(3, 0, 3, 0) };

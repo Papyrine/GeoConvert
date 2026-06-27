@@ -125,14 +125,16 @@ sealed class DiffForm : Form
             Dock = DockStyle.Top,
             ColumnCount = 3,
             RowCount = 2,
-            Height = 84,
-            Padding = new(6, 6, 6, 2),
+            // Auto-size the rows (rather than a fixed-height Absolute row) so they scale with the display
+            // DPI; a fixed row height left the Dock=Fill labels top-aligned against the (DPI-scaled) text
+            // boxes at 125%+.
+            AutoSize = true,
+            AutoSizeMode = AutoSizeMode.GrowAndShrink,
+            Padding = new(6, 6, 6, 4),
         };
         table.ColumnStyles.Add(new(SizeType.Absolute, 60));
         table.ColumnStyles.Add(new(SizeType.Percent, 100));
         table.ColumnStyles.Add(new(SizeType.Absolute, 90));
-        table.RowStyles.Add(new(SizeType.Absolute, 38));
-        table.RowStyles.Add(new(SizeType.Absolute, 38));
 
         pathBoxA = AddInputRow(table, "Map A:", pathA, _ => LoadAInto(_));
         pathBoxB = AddInputRow(table, "Map B:", pathB, _ => LoadBInto(_));
@@ -144,10 +146,10 @@ sealed class DiffForm : Form
         // The label fills its fixed-height cell and centres its text vertically (MiddleLeft), so it lines
         // up with the text box. The box and button anchor left+right at their natural height and the
         // TableLayoutPanel centres them in the row.
-        table.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new(3, 0, 3, 0) });
-        var box = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true, Text = value ?? string.Empty, Margin = new(3, 0, 3, 0) };
+        table.Controls.Add(new Label { Text = label, Dock = DockStyle.Fill, TextAlign = ContentAlignment.MiddleLeft, Margin = new(3, 5, 3, 5) });
+        var box = new TextBox { Anchor = AnchorStyles.Left | AnchorStyles.Right, ReadOnly = true, Text = value ?? string.Empty, Margin = new(3, 5, 3, 5) };
         table.Controls.Add(box);
-        var browse = new Button { Text = "Browse…", Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new(3, 0, 3, 0) };
+        var browse = new Button { Text = "Browse…", Anchor = AnchorStyles.Left | AnchorStyles.Right, Margin = new(3, 5, 3, 5) };
         browse.Click += (_, _) =>
         {
             using var dialog = new OpenFileDialog

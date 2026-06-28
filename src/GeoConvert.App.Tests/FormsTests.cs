@@ -30,7 +30,12 @@ public class FormsTests
         // finally calls SetBusy(false, null), which leaves the label untouched, so without an explicit
         // completion message the transient "Reading FlatGeobuf…" stayed stuck on screen after the map had
         // loaded. Drive a real load to completion and snapshot the settled state.
-        var path = WriteSampleMap();
+        using var directory = new TempDirectory();
+        // FlatGeobuf (the format from the original report) under a fixed file name, so the status reads a
+        // stable "Loaded sample.fgb". RunToCompletion blocks until the load has read the file, so the temp
+        // directory can be disposed as the method returns.
+        var path = Path.Combine(directory, "sample.fgb");
+        GeoConverter.Write(SampleMaps.A(), path, GeoFormat.FlatGeobuf);
         return Verify(
             WinFormsSnapshot.RunToCompletion(
                 () => new MainForm(SeededSettings(), null),
@@ -52,17 +57,6 @@ public class FormsTests
         // The (auto-sizing) About dialog: title, description, the clickable project link and OK button.
         Verify(WinFormsSnapshot.Render(() => new AboutForm(), 420, 220, dpiPercent / 100f))
             .UseParameters(dpiPercent);
-
-    // Writes the shared sample to a stable temp path so the loaded status reads a fixed "Loaded sample.fgb"
-    // — FlatGeobuf to mirror the format from the original report.
-    static string WriteSampleMap()
-    {
-        var directory = Path.Combine(Path.GetTempPath(), "GeoConvert.App.Tests");
-        Directory.CreateDirectory(directory);
-        var path = Path.Combine(directory, "sample.fgb");
-        GeoConverter.Write(SampleMaps.A(), path, GeoFormat.FlatGeobuf);
-        return path;
-    }
 
     static SettingsManager SeededSettings()
     {

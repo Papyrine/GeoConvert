@@ -75,6 +75,81 @@ static class WinFormsSnapshot
         return result!;
     }
 
+    /// <summary>
+    /// Drives an async form operation (a load/save) to completion on the STA thread the form lives on, then
+    /// projects the settled form state with <paramref name="select"/>. The WinForms
+    /// <see cref="SynchronizationContext"/> is installed up-front — before the form is built — so the form's
+    /// <see cref="Progress{T}"/> (captured in its constructor) and every awaited continuation marshal back
+    /// to this thread, where the pump loop runs them; without it they'd post to the thread pool and touch
+    /// controls cross-thread. Use this to snapshot a form *after* an operation has finished (e.g. that a
+    /// completed load leaves a "Loaded …" status, not a stuck "Reading …"), not to draw it mid-flight.
+    /// </summary>
+    public static TResult RunToCompletion<TForm, TResult>(
+        Func<TForm> factory,
+        Func<TForm, Task> operation,
+        Func<TForm, TResult> select,
+        int width,
+        int height)
+        where TForm : Form
+    {
+        TResult result = default!;
+        Exception? failure = null;
+
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                EnsureStyles();
+                if (SynchronizationContext.Current is not WindowsFormsSynchronizationContext)
+                {
+                    SynchronizationContext.SetSynchronizationContext(new WindowsFormsSynchronizationContext());
+                }
+
+                using var form = factory();
+                form.StartPosition = FormStartPosition.Manual;
+                form.ShowInTaskbar = false;
+                form.Location = new(-5000, -5000);
+                form.Size = new(width, height);
+                form.Show();
+                Application.DoEvents();
+
+                var task = operation(form);
+                // Pump the message loop so the posted continuations run on this thread until the operation
+                // settles; the spin cap turns a regression that hangs into a fast failure rather than a hung
+                // test run.
+                for (var spins = 0; !task.IsCompleted; spins++)
+                {
+                    Application.DoEvents();
+                    Thread.Sleep(1);
+                    if (spins > 10_000)
+                    {
+                        throw new TimeoutException("The form operation did not complete within the expected time.");
+                    }
+                }
+
+                task.GetAwaiter().GetResult(); // surface a failed load/save as a test failure
+                Application.DoEvents();         // drain the final posted continuation(s)
+                result = select(form);
+                form.Close();
+            }
+            catch (Exception exception)
+            {
+                failure = exception;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        thread.Join();
+
+        if (failure != null)
+        {
+            throw failure;
+        }
+
+        return result;
+    }
+
     static void Rescale(Control control, float scale)
     {
         if (scale != 1f)

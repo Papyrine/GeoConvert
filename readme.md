@@ -52,14 +52,7 @@ Convert a file to another format (both formats inferred from their extensions):
 GeoConverter.Convert("cities.geojson", "cities.kml");
 GeoConverter.Convert("roads.shp", "roads.fgb");
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L6-L12' title='Snippet source file'>snippet source</a> | <a href='#snippet-Convert' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-Convert-1'></a>
-```cs
-// Formats are inferred from the file extensions.
-GeoConverter.Convert("cities.geojson", "cities.kml");
-GeoConverter.Convert("roads.shp", "roads.fgb");
-```
-<sup><a href='/src/Tests/Snippets.cs#L6-L12' title='Snippet source file'>snippet source</a> | <a href='#snippet-Convert-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L6-L12' title='Snippet source file'>snippet source</a> | <a href='#snippet-Convert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 Read into the common feature model, then write a different format:
@@ -81,24 +74,7 @@ foreach (var feature in collection)
 // Write it back out as a different format.
 GeoConverter.Write(collection, "roads.fgb");
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L17-L33' title='Snippet source file'>snippet source</a> | <a href='#snippet-ReadModifyWrite' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-ReadModifyWrite-1'></a>
-```cs
-// Read any supported format into the common feature model.
-var collection = GeoConverter.Read("roads.shp");
-
-foreach (var feature in collection)
-{
-    if (feature.Properties.TryGetValue("name", out var name))
-    {
-        Console.WriteLine(name);
-    }
-}
-
-// Write it back out as a different format.
-GeoConverter.Write(collection, "roads.fgb");
-```
-<sup><a href='/src/Tests/Snippets.cs#L17-L33' title='Snippet source file'>snippet source</a> | <a href='#snippet-ReadModifyWrite-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L17-L33' title='Snippet source file'>snippet source</a> | <a href='#snippet-ReadModifyWrite' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 Build a collection in memory and serialize it:
@@ -118,22 +94,7 @@ var collection = new FeatureCollection
 
 var geoJson = GeoJson.WriteString(collection);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L38-L52' title='Snippet source file'>snippet source</a> | <a href='#snippet-BuildModel' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-BuildModel-1'></a>
-```cs
-var collection = new FeatureCollection
-{
-    new Feature(
-        new Point(new(151.21, -33.87)),
-        new Dictionary<string, object?>
-        {
-            ["name"] = "Sydney"
-        }),
-};
-
-var geoJson = GeoJson.WriteString(collection);
-```
-<sup><a href='/src/Tests/Snippets.cs#L38-L52' title='Snippet source file'>snippet source</a> | <a href='#snippet-BuildModel-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L38-L52' title='Snippet source file'>snippet source</a> | <a href='#snippet-BuildModel' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -174,36 +135,7 @@ var countries = GeoConverter.Read("countries.geojson");
 var topo = Simplifier.SimplifyTopology(countries, 0.05);
 GeoConverter.Write(topo, "countries-thin.fgb");
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L97-L125' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-Simplify-1'></a>
-```cs
-// Reduce vertex count before writing — the highest-leverage way to shrink dense vector data.
-// Simplifier.Simplify returns a NEW collection (the input is left untouched), preserving layer
-// names, properties, feature ids and structure; only line and polygon-ring vertices are thinned.
-var collection = GeoConverter.Read("coastline.geojson");
-
-// Douglas–Peucker (the default): tolerance is a perpendicular distance in coordinate units
-// (degrees for WGS84). Vertices within that distance of the retained line are dropped.
-var coarse = Simplifier.Simplify(collection, 0.01);
-GeoConverter.Write(coarse, "coastline.topojson");
-
-// Visvalingam–Whyatt: tolerance is an effective triangle area (degrees²) — tends to give a
-// smoother, more evenly generalised outline. Points pass through untouched; polygon rings stay
-// closed and never collapse below a triangle, so the result is always valid.
-var smooth = Simplifier.Simplify(collection, 0.0001, SimplifyMethod.Visvalingam);
-GeoConverter.Write(smooth, "coastline-vw.geojson");
-
-// SimplifyTopology: same algorithms, but adjacent polygons that share a border get that
-// border simplified once — so the two sides stay seamlessly joined. The plain overload thins
-// each ring independently; two countries' shared edges then get different chord choices and
-// no longer line up, leaving hairline gaps (visible as white stripes between countries) or
-// alpha-stacked overlaps when the fill is translucent. Pick this for topologically
-// consistent datasets like Natural Earth admin layers where shared boundaries matter.
-var countries = GeoConverter.Read("countries.geojson");
-var topo = Simplifier.SimplifyTopology(countries, 0.05);
-GeoConverter.Write(topo, "countries-thin.fgb");
-```
-<sup><a href='/src/Tests/Snippets.cs#L97-L125' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L97-L125' title='Snippet source file'>snippet source</a> | <a href='#snippet-Simplify' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -231,27 +163,7 @@ GeoConverter.Convert("countries.geojson", "countries.fgb", progress);
 var features = GeoConverter.Read("countries.geojson");
 MapRenderer.RenderPng(features, "world.png", new() { Progress = progress });
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L132-L151' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-Progress-1'></a>
-```cs
-// Read, Write and Convert each take an optional IProgress<ConvertProgress>. Convert reports the
-// read half under ProgressPhase.Reading and the write half under ProgressPhase.Writing. Every
-// report carries a feature count and a byte count; ConvertProgress.Fraction picks whichever
-// total is known (features when writing, bytes when reading a seekable source) and returns null
-// when neither is — an honest "indeterminate" rather than a fabricated percentage.
-var progress = new Progress<ConvertProgress>(report =>
-{
-    var percent = report.Fraction is { } fraction ? $"{fraction:P0}" : "?";
-    Console.WriteLine($"{report.Phase}: {report.Features} features ({percent})");
-});
-
-GeoConverter.Convert("countries.geojson", "countries.fgb", progress);
-
-// PNG rendering reports through RenderOptions.Progress (one report per feature rasterised).
-var features = GeoConverter.Read("countries.geojson");
-MapRenderer.RenderPng(features, "world.png", new() { Progress = progress });
-```
-<sup><a href='/src/Tests/Snippets.cs#L132-L151' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L132-L151' title='Snippet source file'>snippet source</a> | <a href='#snippet-Progress' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -274,22 +186,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "europe.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L156-L170' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderToPng-1'></a>
-```cs
-var features = GeoConverter.Read("countries.geojson");
-
-// Render a specific bounding box (min lon, min lat, max lon, max lat) to a PNG.
-var options = new RenderOptions
-{
-    Bounds = new Envelope(-10, 35, 30, 60),
-    Width = 1200,
-    Height = 900,
-};
-
-MapRenderer.RenderPng(features, "europe.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L156-L170' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L156-L170' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToPng' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 `RenderOptions` controls the extent (`Bounds`), pixel `Width`/`Height` (height is derived from the aspect ratio when left at 0), `Padding`, and the `Background`/`Stroke`/`Fill` colors. From the command line, output a `.png` and pass `--bbox` and `--size`:
@@ -347,29 +244,7 @@ File.WriteAllText("europe.svg", markup);
 // Or write straight to a file / stream.
 MapRenderer.RenderSvg(features, "europe.svg", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L175-L196' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToSvg' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderToSvg-1'></a>
-```cs
-var features = GeoConverter.Read("countries.geojson");
-
-// SVG is a vector export: same RenderOptions as PNG (bounds, size, projection, colours,
-// labels), but geometry becomes <path>/<polyline>/<circle> and labels become native
-// <text>, so the output scales crisply at any zoom. RenderSvg returns the markup as a
-// string; the path/stream overloads write it out directly.
-var options = new RenderOptions
-{
-    Bounds = new Envelope(-10, 35, 30, 60),
-    Width = 1200,
-    Height = 900,
-};
-
-var markup = MapRenderer.RenderSvg(features, options);
-File.WriteAllText("europe.svg", markup);
-
-// Or write straight to a file / stream.
-MapRenderer.RenderSvg(features, "europe.svg", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L175-L196' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToSvg-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L175-L196' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderToSvg' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 The same `RenderOptions` knobs apply (the format-specific `RenderOptions.Png` and `RenderOptions.Svg` sub-options are the exception — `Png` is ignored for SVG output and `Svg` for PNG). Because labels are emitted as native `<text>`, their glyph shapes depend on the fonts available to the viewer; placement and collision are identical to the PNG renderer (which reserves boxes from the hand-rolled stroke font's metrics). From the command line, output a `.svg` and pass `--bbox`/`--size` exactly as for PNG:
@@ -397,22 +272,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderSvg(features, "world.svg", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L205-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderSvgSimplify' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderSvgSimplify-1'></a>
-```cs
-var options = new RenderOptions
-{
-    Bounds = MapRenderer.WebMercatorWorldBounds,
-    Width = 1024,
-    // Half a pixel: invisible at this render size, but collapses the dense sub-pixel
-    // detail that otherwise bloats the file. A world borders layer drops from ~109 MB
-    // to ~16 MB. The matching PNG render is unaffected (Svg options are SVG-only).
-    Svg = new() { SimplifyTolerance = 0.5 },
-};
-
-MapRenderer.RenderSvg(features, "world.svg", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L205-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderSvgSimplify-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L205-L219' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderSvgSimplify' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 Because the pass runs after projection and the `MinFeaturePixels` selection, it only thins geometry that is actually being drawn; raising the tolerance further yields diminishing returns once the per-vertex spacing drops below a pixel.
@@ -449,23 +309,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L468-L483' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderWebMercator-1'></a>
-```cs
-var features = GeoConverter.Read("countries.geojson");
-
-// Web Mercator matches the layout of standard web tile maps. Pair it with
-// MapRenderer.WebMercatorWorldBounds for the canonical 1:1 square world view; latitude is
-// clamped to ±85.0511° (the cutoff every tile provider uses).
-var options = new RenderOptions
-{
-    Bounds = MapRenderer.WebMercatorWorldBounds,
-    Projection = MapProjection.WebMercator,
-};
-
-MapRenderer.RenderPng(features, "world.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L468-L483' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L468-L483' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -491,22 +335,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L488-L502' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderLambert-1'></a>
-```cs
-var features = GeoConverter.Read("states.geojson");
-
-// Lambert Conformal Conic with standard parallels picked from the data bounds — the textbook
-// choice for state/country-scale maps. Conformal and low-distortion across a regional extent,
-// so this avoids both plate-carrée's high-latitude squish and Web Mercator's pole stretch.
-var options = new RenderOptions
-{
-    Projection = MapProjection.Lambert,
-};
-
-MapRenderer.RenderPng(features, "states.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L488-L502' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L488-L502' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -535,27 +364,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L507-L526' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderGoode-1'></a>
-```cs
-var features = GeoConverter.Read("countries.geojson");
-
-// Goode's Homolosine (interrupted into 2 northern and 4 southern lobes along ocean
-// meridians, the conventional layout): equal-area, so areas at high latitudes don't blow
-// up like they do under Web Mercator or compress like they do under plate carrée, and the
-// lobe interrupts keep distortion low on every continent. This is what MapProjection.Auto
-// picks for a world map, so the explicit Projection assignment is only needed when you
-// want the specific extent — leaving it off and letting Auto pick produces the same result.
-// Ocean fills each lobe under the continents so the projection's lobed shape (and the
-// inter-lobe gaps) reads clearly.
-var options = new RenderOptions
-{
-    Projection = MapProjection.Goode,
-};
-
-MapRenderer.RenderPng(features, "world.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L507-L526' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L507-L526' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -614,52 +423,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(basemap, "europe.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L224-L268' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderLayers-1'></a>
-```cs
-// A FeatureCollection with named sub-layers — the renderer walks the tree depth-first, so a
-// parent layer paints under its children. RenderOptions.LayerStyle picks per-layer colors;
-// any property left null falls back to the defaults on RenderOptions.
-var basemap = new FeatureCollection
-{
-    Name = "basemap"
-};
-basemap.Add(
-    new Feature(
-        new Polygon(
-        [
-            [new(-10, 35), new(30, 35), new(30, 60), new(-10, 60), new(-10, 35)],
-        ])));
-
-var roads = new FeatureCollection
-{
-    Name = "roads"
-};
-roads.Add(new Feature(new LineString([new(0, 40), new(20, 55)])));
-basemap.Children.Add(roads);
-
-var options = new RenderOptions
-{
-    Bounds = new Envelope(-10, 35, 30, 60),
-    LayerStyle = layer => layer.Name switch
-    {
-        "basemap" => new()
-        {
-            Fill = new(230, 230, 230),
-            Stroke = new(180, 180, 180),
-        },
-        "roads" => new()
-        {
-            Stroke = new(200, 60, 60),
-            StrokeWidth = 3,
-        },
-        _ => null,
-    },
-};
-
-MapRenderer.RenderPng(basemap, "europe.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L224-L268' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L224-L268' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLayers' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 When the layers come from independent sources (typically a basemap file plus an overlay file), pass the collections as a list — they render in order, first under, last on top. Each `FeatureCollection` is a top-level layer for `RenderOptions.LayerStyle`, and the rendered extent defaults to the union of every input's bounds:
@@ -697,40 +461,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L273-L305' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderStackedCollections-1'></a>
-```cs
-// When the layers come from independent sources (a basemap file plus an overlay file, say),
-// pass them as a list — they render in order, first under, last on top. Each FeatureCollection
-// is a top-level layer for RenderOptions.LayerStyle, so giving each one a Name is enough to
-// style them distinctly. When Bounds is null the rendered extent is the union of every input.
-var basemap = GeoConverter.Read("countries.geojson");
-basemap.Name = "basemap";
-
-var roads = GeoConverter.Read("roads.shp");
-roads.Name = "roads";
-
-var options = new RenderOptions
-{
-    LayerStyle = layer => layer.Name switch
-    {
-        "basemap" => new()
-        {
-            Fill = new(230, 230, 230),
-            Stroke = new(180, 180, 180),
-        },
-        "roads" => new()
-        {
-            Stroke = new(200, 60, 60),
-            StrokeWidth = 3,
-        },
-        _ => null,
-    },
-};
-
-MapRenderer.RenderPng([basemap, roads], "stacked.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L273-L305' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L273-L305' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderStackedCollections' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -776,34 +507,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L373-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderLabelHalo-1'></a>
-```cs
-// Halo treatment: every glyph stroke is first drawn in the halo colour at a slightly
-// wider stroke, so the foreground text reads against busy fills as if outlined. The
-// halo extends 2 px past the foreground stroke on every side; that's enough to lift
-// text off most country-fill colours but a thin border line can still bleed through
-// the ring on dense political maps. Default halo is a semi-transparent white, which
-// works for dark text on light backgrounds out of the box; pass null to disable.
-var features = GeoConverter.Read("countries.geojson");
-var options = new RenderOptions
-{
-    Bounds = new(-12, 35, 32, 60),
-    Width = 800,
-    Projection = MapProjection.Lambert,
-    Background = new(245, 245, 245),
-    Fill = new(220, 220, 210),
-    Stroke = new(120, 120, 120),
-    StrokeWidth = 1,
-    Label = feature =>
-        feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
-    LabelSize = 14,
-    LabelColor = new(30, 30, 30),
-    LabelHalo = new(255, 255, 255, 220),
-};
-MapRenderer.RenderPng(features, "europe-halo.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L373-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L373-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -840,35 +544,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L404-L431' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderLabelKnockout-1'></a>
-```cs
-// Knockout treatment: before the halo and text strokes, a solid rect of the knockout
-// colour is painted over the label's bounding box. The geometry underneath is fully
-// erased (opaque colour) or dimmed (semi-transparent), so country borders don't bleed
-// through the way they can with a halo ring. Typically set to match Background for a
-// clean masked look; pair with LabelHalo = null for a flat rectangle, or leave the
-// halo on for a knockout-rect with an outline around the text.
-var features = GeoConverter.Read("countries.geojson");
-var options = new RenderOptions
-{
-    Bounds = new(-12, 35, 32, 60),
-    Width = 800,
-    Projection = MapProjection.Lambert,
-    Background = new(245, 245, 245),
-    Fill = new(220, 220, 210),
-    Stroke = new(120, 120, 120),
-    StrokeWidth = 1,
-    Label = feature =>
-        feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
-    LabelSize = 14,
-    LabelColor = new(30, 30, 30),
-    LabelHalo = null,
-    LabelKnockout = new(245, 245, 245),
-};
-MapRenderer.RenderPng(features, "europe-knockout.png", options);
-```
-<sup><a href='/src/Tests/Snippets.cs#L404-L431' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L404-L431' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -934,66 +610,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L310-L368' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-RenderLabels-1'></a>
-```cs
-// Label every feature with its "name" property. Polygon/line labels sit on the
-// centroid / arclength midpoint; point labels walk Imhof's 8-position candidate ring
-// around the dot (NE → NW → SE → SW → E → W → N → S) so the label doesn't paint on
-// top of the point marker. Collision and off-canvas rejection drop labels silently.
-// The single-stroke vector font handles printable ASCII plus the Latin diacritics that
-// decompose to an ASCII base + combining mark (grave, acute, circumflex, tilde,
-// diaeresis, ring, caron, cedilla); ligatures like ß, æ, ø and the non-Latin blocks
-// render as '?'. LabelSize is the cap height in pixels — the font scales continuously,
-// so any positive value works (12–16 for 2k canvases, 20+ for high-res).
-var features = GeoConverter.Read("cities.geojson");
-
-var options = new RenderOptions
-{
-    Label = feature =>
-        feature.Properties.TryGetValue("name", out var value) ? value as string : null,
-    LabelSize = 18,
-    LabelColor = new(20, 20, 20),
-    LabelHalo = new(255, 255, 255, 220),
-};
-
-MapRenderer.RenderPng(features, "cities.png", options);
-
-// Per-layer override: a child layer can carry its own label callback (or scale/color/halo)
-// independent of the options-wide default. Setting Label = _ => null on a LayerStyle
-// suppresses labelling for that layer.
-options.LayerStyle = layer => layer.Name == "annotations"
-    ? new LayerStyle { Label = feature => feature.Properties["text"] as string }
-    : null;
-
-// By default, labels are placed largest-feature-first so when two collide the bigger
-// polygon's name wins. Override LabelPriority to drive collision order from anything
-// else — a feature property like population, or an external lookup captured in the
-// closure. Without this, Natural Earth's "Ireland" would beat "United Kingdom" on file
-// order; with population priority, UK (67M) outranks Ireland (5M) and gets the spot.
-options.LabelPriority = feature =>
-    feature.Properties.TryGetValue("POP_EST", out var p) ? Convert.ToDouble(p) : 0;
-
-// Or look priorities up in a separate table — useful when the data and the importance
-// ranking live in different files.
-var populations = new Dictionary<string, double>
-{
-    ["United Kingdom"] = 67_000_000,
-    ["Ireland"] = 5_000_000,
-};
-options.LabelPriority = feature =>
-{
-    if (feature.Properties.TryGetValue("NAME", out var name) &&
-        name is string n &&
-        populations.TryGetValue(n, out var pop))
-    {
-        return pop;
-    }
-
-    return 0;
-};
-```
-<sup><a href='/src/Tests/Snippets.cs#L310-L368' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L310-L368' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -1035,33 +652,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L438-L463' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-Compression-1'></a>
-```cs
-// PNG: the deflate level for the IDAT chunk is exposed on RenderOptions.Png.
-MapRenderer.RenderPng(
-    features,
-    "world.png",
-    new()
-    {
-        Bounds = MapRenderer.WebMercatorWorldBounds,
-        Projection = MapProjection.WebMercator,
-        Png = new() { Compression = CompressionLevel.Fastest },
-    });
-
-// KMZ: the doc.kml zip entry's compression level is an optional Write argument.
-using (var kmz = File.Create("world.kmz"))
-{
-    Kmz.Write(kmz, features, CompressionLevel.SmallestSize);
-}
-
-// GeoParquet: pick the codec (default Snappy); CompressionLevel only applies to Gzip.
-using (var parquet = File.Create("world.parquet"))
-{
-    GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
-}
-```
-<sup><a href='/src/Tests/Snippets.cs#L438-L463' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L438-L463' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -1150,41 +741,7 @@ foreach (var feature in root)
     Console.WriteLine(feature.Geometry);
 }
 ```
-<sup><a href='/.claude/worktrees/vibrant-hermann-764bf8/src/Tests/Snippets.cs#L59-L92' title='Snippet source file'>snippet source</a> | <a href='#snippet-Layered' title='Start of snippet'>anchor</a></sup>
-<a id='snippet-Layered-1'></a>
-```cs
-// A FeatureCollection can hold nested child layers, each with its own Name. Formats with a
-// native layer concept (KML folders, TopoJSON objects, KMZ documents, GPX wpt/rte/trk,
-// Shapefile bundle directories) round-trip this structure; everything else flattens via the
-// recursive enumerator.
-var cities = new FeatureCollection
-{
-    Name = "cities"
-};
-cities.Add(new Feature(new Point(new(151.21, -33.87))));
-
-var roads = new FeatureCollection
-{
-    Name = "roads"
-};
-roads.Add(new Feature(new LineString([new(151.20, -33.86), new(151.22, -33.88)])));
-
-var root = new FeatureCollection
-{
-    Name = "sydney"
-};
-root.Children.Add(cities);
-root.Children.Add(roads);
-
-GeoConverter.Write(root, "sydney.kml"); // emits <Folder name="cities">… <Folder name="roads">…
-
-// Single-layer formats just flatten — iterating any collection always yields every feature.
-foreach (var feature in root)
-{
-    Console.WriteLine(feature.Geometry);
-}
-```
-<sup><a href='/src/Tests/Snippets.cs#L59-L92' title='Snippet source file'>snippet source</a> | <a href='#snippet-Layered-1' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L59-L92' title='Snippet source file'>snippet source</a> | <a href='#snippet-Layered' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

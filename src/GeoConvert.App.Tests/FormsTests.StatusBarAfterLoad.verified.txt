@@ -1,0 +1,5 @@
+{
+  StatusText: Loaded sample.fgb,
+  BusyIndicatorVisible: false,
+  CanSave: true
+}

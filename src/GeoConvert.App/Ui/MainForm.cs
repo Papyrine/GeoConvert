@@ -184,7 +184,14 @@ sealed class MainForm : Form
         MessageBox.Show(this, "The bundled sample world map isn't available next to the app.", "GeoConvert", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
 
-    async Task LoadAsync(string path)
+    // Test seams: the settled status-bar state, so a snapshot can prove a finished read returns to a clean
+    // idle (status replaced, progress hidden, save re-enabled) rather than leaving the transient
+    // "Reading …" message stuck on screen — see FormsTests.StatusBarAfterLoad.
+    internal string StatusText => statusLabel.Text ?? "";
+    internal bool BusyIndicatorVisible => progressBar.Visible;
+    internal bool CanSave => saveButton.Enabled;
+
+    internal async Task LoadAsync(string path)
     {
         var detected = ConversionService.Detect(path);
         if (detected is not {CanRead: true})
@@ -202,10 +209,12 @@ sealed class MainForm : Form
             sourceFormat = detected;
             fileLabel.Text = $"{Path.GetFileName(path)}  ·  {detected.DisplayName}  ·  {collection.Count} feature{(collection.Count == 1 ? "" : "s")}";
             await RefreshPreviewAsync();
+            statusLabel.Text = $"Loaded {Path.GetFileName(path)}";
         }
         catch (Exception exception)
         {
             features = null;
+            statusLabel.Text = "";
             ShowError("Could not read the map", exception);
         }
         finally
@@ -286,6 +295,7 @@ sealed class MainForm : Form
         }
         catch (Exception exception)
         {
+            statusLabel.Text = "";
             ShowError($"Could not save as {info.DisplayName}", exception);
         }
         finally

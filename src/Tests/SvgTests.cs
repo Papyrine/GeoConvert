@@ -410,8 +410,8 @@ public class SvgTests
         {
             var x = i / 10.0;
             // A barely-perceptible wobble (well under a pixel once projected) on an otherwise straight edge.
-            ring.Add(new(x, 5 + (i % 2) * 0.001));
-            line.Add(new(x, 2 + (i % 2) * 0.001));
+            ring.Add(new(x, 5 + i % 2 * 0.001));
+            line.Add(new(x, 2 + i % 2 * 0.001));
         }
 
         ring.Add(new(10, 0));

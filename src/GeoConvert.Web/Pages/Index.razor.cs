@@ -171,7 +171,7 @@ public partial class Index
         {
             buffer.Write(chunk, 0, count);
             read += count;
-            progress?.Report(new ConvertProgress(ProgressPhase.Reading, 0, null, read, null));
+            progress?.Report(new(ProgressPhase.Reading, 0, null, read, null));
         }
 
         return buffer.ToArray();

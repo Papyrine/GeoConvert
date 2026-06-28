@@ -24,7 +24,7 @@
     <PackageVersion Include="Parquet.Net" Version="6.0.3" />
     <PackageVersion Include="MapBundle" Version="1.0.0" />
     <PackageVersion Include="MapBundle.World" Version="1.0.0" />
-    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.9" />
+    <PackageVersion Include="Microsoft.AspNetCore.Components.WebAssembly" Version="11.0.0-preview.5.26302.115" />
     <PackageVersion Include="bunit" Version="2.7.2" />
     <PackageVersion Include="Verify.Bunit" Version="13.0.3" />
     <PackageVersion Include="Microsoft.AspNetCore.TestHost" Version="10.0.9" />

@@ -49,7 +49,7 @@ jobs:
       # TUnit ships as an executable on Microsoft.Testing.Platform; run it directly rather than via
       # `dotnet test`, which rejects it under the VSTest path.
       - name: Run tests
-        run: dotnet src/GeoConvert.Web.Tests/bin/Release/net10.0/GeoConvert.Web.Tests.dll
+        run: dotnet src/GeoConvert.Web.Tests/bin/Release/net11.0/GeoConvert.Web.Tests.dll
 
       - name: Publish
         run: dotnet publish src/GeoConvert.Web --configuration Release --output publish

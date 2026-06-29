@@ -84,12 +84,28 @@ static class WinFormsSnapshot
     /// controls cross-thread. Use this to snapshot a form *after* an operation has finished (e.g. that a
     /// completed load leaves a "Loaded …" status, not a stuck "Reading …"), not to draw it mid-flight.
     /// </summary>
+    /// <summary>
+    /// Like <see cref="RunToCompletion"/> but projects the settled form as a <see cref="Bitmap"/> — drives
+    /// an async load/render to completion, then snapshots the populated window. This is how the documented
+    /// "diff loaded" / "map loaded" states are captured: deterministically, through the same draw path as
+    /// the empty-window snapshots (so the non-client-frame fix applies), rather than a live screen grab.
+    /// </summary>
+    public static Bitmap RenderAfter<TForm>(
+        Func<TForm> factory,
+        Func<TForm, Task> operation,
+        int width,
+        int height,
+        float scale = 1f)
+        where TForm : Form =>
+        RunToCompletion(factory, operation, form => Draw(form), width, height, scale);
+
     public static TResult RunToCompletion<TForm, TResult>(
         Func<TForm> factory,
         Func<TForm, Task> operation,
         Func<TForm, TResult> select,
         int width,
-        int height)
+        int height,
+        float scale = 1f)
         where TForm : Form
     {
         TResult result = default!;
@@ -109,7 +125,12 @@ static class WinFormsSnapshot
                 form.StartPosition = FormStartPosition.Manual;
                 form.ShowInTaskbar = false;
                 form.Location = new(-5000, -5000);
-                form.Size = new(width, height);
+                if (!form.AutoSize)
+                {
+                    form.Size = new(width, height);
+                }
+
+                Rescale(form, scale);
                 form.Show();
                 Application.DoEvents();
 
@@ -160,7 +181,14 @@ static class WinFormsSnapshot
 
     static Bitmap Draw(Control control)
     {
-        var bounds = control.ClientRectangle;
+        // A top-level Form draws its non-client frame (title bar + borders) into the bitmap, so the target
+        // must span the whole window. ClientRectangle excludes the frame, which clipped the right and
+        // bottom borders off every form snapshot (most visibly on the small About dialog, where the OK
+        // button sits in the corner). A hosted child control has no non-client area, so its client
+        // rectangle already is its whole surface.
+        var bounds = control is Form
+            ? new Rectangle(0, 0, control.Width, control.Height)
+            : control.ClientRectangle;
         var bitmap = new Bitmap(Math.Max(1, bounds.Width), Math.Max(1, bounds.Height));
         control.DrawToBitmap(bitmap, bounds);
         return bitmap;

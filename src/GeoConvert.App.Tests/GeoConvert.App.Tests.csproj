@@ -12,7 +12,20 @@
     <!-- WinForms snapshot tests are Windows-only by nature, like the app they test (which also NoWarns
          this). Suppresses the platform-compatibility analyzer for the WinForms calls. -->
     <NoWarn>$(NoWarn);CA1416</NoWarn>
+    <!-- Stage the same bundled sample world map the app ships (maps/World/borders.fgb beside the exe),
+         so the MainWindowWithMap snapshot can load it via SampleMap.Locate() exactly as the app does.
+         Same knobs as GeoConvert.App.csproj so the staged map is byte-identical. -->
+    <MapBundleLayers>Borders</MapBundleLayers>
+    <MapBundleSimplifyTolerance>0.1</MapBundleSimplifyTolerance>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Demo maps for the diff snapshots, copied flat next to the test exe so the populated DiffForm
+         loads them by bare name — which keeps the path boxes showing a stable "before.geojson" /
+         "after.geojson" rather than a machine-specific absolute path. -->
+    <None Include="Maps\before.geojson" Link="before.geojson" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Maps\after.geojson" Link="after.geojson" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ProjectFiles" />
@@ -20,6 +33,7 @@
     <PackageReference Include="Verify.TUnit" />
     <PackageReference Include="Verify.WinForms" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
+    <PackageReference Include="MapBundle.World" PrivateAssets="all" />
     <ProjectReference Include="..\GeoConvert.App\GeoConvert.App.csproj" />
   </ItemGroup>
 

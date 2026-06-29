@@ -31,12 +31,13 @@ public class FormsTests
     [Test]
     public Task MainWindowWithMap()
     {
+        using var file = TempFile.Create("json");
         var sample = SampleMap.Locate() ?? throw new InvalidOperationException(
             "The bundled sample world map was not staged next to the test exe (MapBundle.World).");
         return Verify(
             WinFormsSnapshot.RenderAfter(
-                () => new MainForm(SeededSettings(), null),
-                form => form.LoadAsync(sample),
+                () => new MainForm(SeededSettings(file), null),
+                _ => _.LoadAsync(sample),
                 1000,
                 680));
     }
@@ -60,7 +61,7 @@ public class FormsTests
         {
             return WinFormsSnapshot.RenderAfter(
                 () => new DiffForm(mode),
-                form => form.LoadAndRenderAsync("before.geojson", "after.geojson"),
+                _ => _.LoadAndRenderAsync("before.geojson", "after.geojson"),
                 1000,
                 680);
         }
@@ -88,12 +89,12 @@ public class FormsTests
         return Verify(
             WinFormsSnapshot.RunToCompletion(
                 () => new MainForm(SeededSettings(file), null),
-                form => form.LoadAsync(path),
-                form => new
+                _ => _.LoadAsync(path),
+                _ => new
                 {
-                    form.StatusText,
-                    form.BusyIndicatorVisible,
-                    form.CanSave
+                    _.StatusText,
+                    _.BusyIndicatorVisible,
+                    _.CanSave
                 },
                 1000,
                 680));

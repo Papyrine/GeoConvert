@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 // Exercises Simplifier (the public facade) and LineSimplifier (the Douglas–Peucker /
 // Visvalingam–Whyatt vertex reduction behind it).
 public class SimplifyTests
@@ -171,7 +169,7 @@ public class SimplifyTests
     [Test]
     public async Task Unknown_geometry_passes_through()
     {
-        var geometry = new G.BadGeometry();
+        var geometry = new BadGeometry();
         await Assert.That(ReferenceEquals(Simplifier.Simplify(geometry, 0.1), geometry)).IsTrue();
     }
 
@@ -216,7 +214,7 @@ public class SimplifyTests
     public async Task Unknown_method_throws()
     {
         var line = new LineString([new(0, 0), new(1, 0), new(2, 0)]);
-        await Assert.That(G.ThrowsGeo(() => Simplifier.Simplify(line, 0.1, (SimplifyMethod) 99))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Simplifier.Simplify(line, 0.1, (SimplifyMethod) 99))).IsTrue();
     }
 
     [Test]
@@ -526,7 +524,7 @@ public class SimplifyTests
     {
         // Defensive default branch in RebuildGeometry: an unrecognised Geometry subclass has no
         // rings/lines to swap and is returned as-is. The gather pass also ignores it.
-        var bad = new G.BadGeometry();
+        var bad = new BadGeometry();
         var collection = new FeatureCollection
         {
             new Feature(bad),

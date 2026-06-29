@@ -1,4 +1,3 @@
-using G = TestSupport;
 
 // Targeted regressions for the audit findings — each test pins a previously broken behavior so a
 // regression on a single bug fails in isolation rather than getting buried in a wider snapshot.
@@ -68,7 +67,7 @@ public class BugFixTests
         {
             new Feature(new Point(new(double.PositiveInfinity, 1)))
         };
-        await Assert.That(G.ThrowsGeo(() => GeoJson.WriteString(source))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoJson.WriteString(source))).IsTrue();
     }
 
     [Test]
@@ -78,7 +77,7 @@ public class BugFixTests
         {
             new Feature(new Point(new(double.PositiveInfinity, 1)))
         };
-        await Assert.That(G.ThrowsGeo(() => TopoJson.WriteString(source))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => TopoJson.WriteString(source))).IsTrue();
     }
 
     // #3 — DBF field names are capped at 10 chars; two property keys sharing a 10-char prefix used to
@@ -200,7 +199,7 @@ public class BugFixTests
         const string gpx =
             """<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1"><wpt lat="oops" lon="0"/></gpx>""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(gpx));
-        await Assert.That(G.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -209,7 +208,7 @@ public class BugFixTests
         const string gpx =
             """<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1"><wpt lon="0"/></gpx>""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(gpx));
-        await Assert.That(G.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -218,7 +217,7 @@ public class BugFixTests
         const string gpx =
             """<?xml version="1.0"?><gpx xmlns="http://www.topografix.com/GPX/1/1" version="1.1"><wpt lat="1" lon="2"><ele>oops</ele></wpt></gpx>""";
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(gpx));
-        await Assert.That(G.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -231,7 +230,7 @@ public class BugFixTests
             </Document></kml>
             """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(kml));
-        await Assert.That(G.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -244,7 +243,7 @@ public class BugFixTests
             </Document></kml>
             """;
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(kml));
-        await Assert.That(G.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
     }
 
     // #8 — WKB MultiPoint/MultiLineString/MultiPolygon used to cast sub-geometries without type
@@ -259,7 +258,7 @@ public class BugFixTests
             1, 0x04, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
             1, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
         ];
-        await Assert.That(G.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
     }
 
     [Test]
@@ -272,7 +271,7 @@ public class BugFixTests
             1, 0x01, 0x00, 0x00, 0x00,
             .. BitConverter.GetBytes(0d), .. BitConverter.GetBytes(0d),
         ];
-        await Assert.That(G.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
     }
 
     [Test]
@@ -285,7 +284,7 @@ public class BugFixTests
             1, 0x01, 0x00, 0x00, 0x00,
             .. BitConverter.GetBytes(0d), .. BitConverter.GetBytes(0d),
         ];
-        await Assert.That(G.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(bytes))).IsTrue();
     }
 
     // #9 — GeoJSON writer used to emit polygon rings in whatever orientation came in; RFC 7946 §3.1.6
@@ -329,7 +328,7 @@ public class BugFixTests
         // "fgb\x03" matches the first half but the second half differs from the canonical magic.
         byte[] data = [0x66, 0x67, 0x62, 0x03, 0x66, 0x67, 0x62, 0x99];
         using var stream = new MemoryStream(data);
-        await Assert.That(G.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
     }
 
     // #11 — A shapefile whose polygon contains two clockwise rings (two separate exteriors) must
@@ -360,7 +359,7 @@ public class BugFixTests
     {
         // 5-byte varint for 0xFFFFFFFF: 0xFF 0xFF 0xFF 0xFF 0x0F. No further block bytes.
         byte[] data = [0xFF, 0xFF, 0xFF, 0xFF, 0x0F];
-        await Assert.That(G.ThrowsGeo(() => Snappy.Decompress(data))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Snappy.Decompress(data))).IsTrue();
     }
 
     // #13 — A truncated WKB (declares a type but cuts off mid-record) used to leak
@@ -371,8 +370,8 @@ public class BugFixTests
         // Declares a Point (type 1) but supplies no coordinates.
         byte[] truncated = [1, 0x01, 0x00, 0x00, 0x00];
         using var stream = new MemoryStream(truncated);
-        await Assert.That(G.ThrowsGeo(() => Wkb.Read(stream))).IsTrue();
-        await Assert.That(G.ThrowsGeo(() => Wkb.ParseGeometry(truncated))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(truncated))).IsTrue();
     }
 
     [Test]
@@ -381,7 +380,7 @@ public class BugFixTests
         // Valid magic, but the size-prefixed header is cut off mid-structure.
         byte[] truncated = [0x66, 0x67, 0x62, 0x03, 0x66, 0x67, 0x62, 0x00, 0x10, 0x00];
         using var stream = new MemoryStream(truncated);
-        await Assert.That(G.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -391,7 +390,7 @@ public class BugFixTests
         // length-bounded read this would walk off the end of the GetBuffer() backing array.
         byte[] truncated = [0x66, 0x67, 0x62, 0x03, 0x66, 0x67, 0x62, 0x00, 0xE8, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
         using var stream = new MemoryStream(truncated);
-        await Assert.That(G.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
     }
 
     // The above XML-malformed inputs already exercise the GeoConvertException re-throw path. These
@@ -401,14 +400,14 @@ public class BugFixTests
     public async Task Gpx_wraps_xml_exception()
     {
         using var stream = new MemoryStream("not really xml at all"u8.ToArray());
-        await Assert.That(G.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Gpx.Read(stream))).IsTrue();
     }
 
     [Test]
     public async Task Kml_wraps_xml_exception()
     {
         using var stream = new MemoryStream("not really xml at all"u8.ToArray());
-        await Assert.That(G.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Kml.Read(stream))).IsTrue();
     }
 
     // Wkb.Read (the streaming path) needs its own coverage of the GeoConvertException re-throw
@@ -418,7 +417,7 @@ public class BugFixTests
     {
         byte[] bytes = [1, 99, 0, 0, 0];
         using var stream = new MemoryStream(bytes);
-        await Assert.That(G.ThrowsGeo(() => Wkb.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.Read(stream))).IsTrue();
     }
 
     // Shapefile decomposition: a CCW ring whose bbox lies inside the prior CW exterior is a hole
@@ -476,7 +475,7 @@ public class BugFixTests
 
         using var directory = new TempDirectory();
         var path = Path.Combine(directory, "out.shp");
-        await Assert.That(G.ThrowsGeo(() => Shapefile.Write(path, [feature])))
+        await Assert.That(TestSupport.ThrowsGeo(() => Shapefile.Write(path, [feature])))
             .IsTrue();
     }
 

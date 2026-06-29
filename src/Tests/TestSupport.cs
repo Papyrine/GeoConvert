@@ -94,18 +94,18 @@ static class TestSupport
             return true;
         }
     }
+}
 
-    // A geometry whose Type is not a real enum value, used to drive defensive default branches.
-    public sealed class BadGeometry : Geometry
-    {
-        public override GeometryType Type => (GeometryType)99;
+// A geometry whose Type is not a real enum value, used to drive defensive default branches.
+public sealed class BadGeometry : Geometry
+{
+    public override GeometryType Type => (GeometryType)99;
 
-        public override bool IsEmpty => false;
+    public override bool IsEmpty => false;
 
-        public override bool HasZ => false;
+    public override bool HasZ => false;
 
-        public override bool HasM => false;
+    public override bool HasM => false;
 
-        public override Envelope GetBounds() => new(0, 0, 1, 1);
-    }
+    public override Envelope GetBounds() => new(0, 0, 1, 1);
 }

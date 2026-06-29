@@ -51,13 +51,7 @@ public class GeoParquetInteropTests
         }
 
         stream.Position = 0;
-#if NET11_0_OR_GREATER
-        var collection = GeoConverter.Read(stream, GeoFormat.GeoParquet);
-        await Assert.That(((Point) collection.Features[0].Geometry!).Coordinate.X).IsEqualTo(8d);
-#else
-        // Zstd decoding needs the .NET 11 BCL; on the shipped (≤ net10) targets the reader rejects it.
-        await Assert.That(G.ThrowsGeo(() => GeoConverter.Read(stream, GeoFormat.GeoParquet))).IsTrue();
-#endif
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoConverter.Read(stream, GeoFormat.GeoParquet))).IsTrue();
     }
 
     [Test]

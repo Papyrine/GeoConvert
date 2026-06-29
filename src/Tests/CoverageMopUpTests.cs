@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 // Targets the last few uncovered branches across the codebase.
 public class CoverageMopUpTests
 {
@@ -14,8 +12,8 @@ public class CoverageMopUpTests
     public async Task Converter_shapefile_stream_throws()
     {
         using var stream = new MemoryStream();
-        await Assert.That(G.ThrowsGeo(() => GeoConverter.Read(stream, GeoFormat.Shapefile))).IsTrue();
-        await Assert.That(G.ThrowsGeo(() =>
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoConverter.Read(stream, GeoFormat.Shapefile))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() =>
             GeoConverter.Write(new(), stream, GeoFormat.Shapefile))).IsTrue();
     }
 
@@ -28,7 +26,7 @@ public class CoverageMopUpTests
         {
             new Feature(new Point(new(1, 2, null, 5)))
         };
-        var back = (Point) G.RoundtripStream(source, GeoFormat.Wkb).Features[0].Geometry!;
+        var back = (Point) TestSupport.RoundtripStream(source, GeoFormat.Wkb).Features[0].Geometry!;
         await Assert.That(back.Coordinate.M).IsEqualTo(5d);
         await Assert.That(back.Coordinate.Z).IsNull();
     }
@@ -72,7 +70,7 @@ public class CoverageMopUpTests
             }
         };
 
-        var back = G.RoundtripStream(
+        var back = TestSupport.RoundtripStream(
             [
                 line,
                 new Feature()
@@ -113,7 +111,7 @@ public class CoverageMopUpTests
                 ["big"] = long.MaxValue
             }
         };
-        var back = G.RoundtripShapefile([feature]);
+        var back = TestSupport.RoundtripShapefile([feature]);
         await Assert.That(back.Features[0].Properties["big"]).IsNotNull();
     }
 
@@ -161,7 +159,7 @@ public class CoverageMopUpTests
             }
         };
 
-        var back = G.RoundtripStream(
+        var back = TestSupport.RoundtripStream(
             [
                 a,
                 b,
@@ -219,7 +217,7 @@ public class CoverageMopUpTests
         }
 
         memory.Position = 0;
-        await Assert.That(G.ThrowsGeo(() => Kmz.Read(memory))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Kmz.Read(memory))).IsTrue();
     }
 
     [Test]

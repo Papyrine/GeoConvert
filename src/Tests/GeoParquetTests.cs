@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 public class GeoParquetTests
 {
     const string goodGeo =
@@ -8,9 +6,9 @@ public class GeoParquetTests
     [Test]
     public async Task Roundtrips_mixed()
     {
-        var result = G.RoundtripStream(Sample.Mixed(), GeoFormat.GeoParquet);
+        var result = TestSupport.RoundtripStream(Sample.Mixed(), GeoFormat.GeoParquet);
 
-        await Assert.That(G.Types(result)).IsEquivalentTo(
+        await Assert.That(TestSupport.Types(result)).IsEquivalentTo(
             [GeometryType.Point, GeometryType.LineString, GeometryType.Polygon]);
 
         await Assert.That(result.Features[0].Properties["name"]).IsEqualTo("alpha");
@@ -70,7 +68,7 @@ public class GeoParquetTests
     {
         using var stream = new MemoryStream();
         await Assert.That(
-                G.ThrowsGeo(() => GeoParquet.Write(stream, Sample.Mixed(), (ParquetCompression)99)))
+                TestSupport.ThrowsGeo(() => GeoParquet.Write(stream, Sample.Mixed(), (ParquetCompression)99)))
             .IsTrue();
     }
 
@@ -87,7 +85,7 @@ public class GeoParquetTests
                 new Dictionary<string, object?> { ["absent"] = null, ["n"] = 2.5, ["m"] = "text" }),
         };
 
-        var result = G.RoundtripStream(features, GeoFormat.GeoParquet);
+        var result = TestSupport.RoundtripStream(features, GeoFormat.GeoParquet);
 
         // "n" widened long+double -> double; "m" widened long+string -> string.
         await Assert.That(result.Features[0].Properties["n"]).IsEqualTo(1d);
@@ -101,7 +99,7 @@ public class GeoParquetTests
     [Test]
     public async Task Roundtrips_empty()
     {
-        var result = G.RoundtripStream([], GeoFormat.GeoParquet);
+        var result = TestSupport.RoundtripStream([], GeoFormat.GeoParquet);
         await Assert.That(result.Count).IsEqualTo(0);
     }
 

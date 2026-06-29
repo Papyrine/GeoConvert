@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 // Unit tests for the hand-rolled Thrift compact protocol (GeoConvert has InternalsVisibleTo).
 public class ThriftTests
 {
@@ -165,6 +163,6 @@ public class ThriftTests
         // Field header with compact type 13 (not a valid type) → Skip throws.
         var reader = new ThriftCompactReader([0x1D, 0x00]);
         var (type, _) = reader.ReadFieldHeader();
-        await Assert.That(G.ThrowsGeo(() => reader.Skip(type))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => reader.Skip(type))).IsTrue();
     }
 }

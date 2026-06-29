@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 // Drives the GeoParquet reader's defensive branches by hand-assembling minimal (but correctly framed)
 // Parquet files via the internal helpers — giving exact control over page type, encoding, codec and
 // physical type, which is awkward to coax out of a real Parquet writer.
@@ -37,7 +35,7 @@ public class GeoParquetCraftTests
         };
 
         using var stream = new MemoryStream(data);
-        await Assert.That(G.ThrowsGeo(() => GeoParquet.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoParquet.Read(stream))).IsTrue();
     }
 
     static byte[] Craft(int pageType, int encoding, int codec, int columnType, string? geo)

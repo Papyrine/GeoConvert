@@ -185,7 +185,7 @@ static class WinFormsSnapshot
         // button sits in the corner). A hosted child control has no non-client area, so its client
         // rectangle already is its whole surface.
         var bounds = control is Form
-            ? new Rectangle(0, 0, control.Width, control.Height)
+            ? new(0, 0, control.Width, control.Height)
             : control.ClientRectangle;
         var bitmap = new Bitmap(Math.Max(1, bounds.Width), Math.Max(1, bounds.Height));
         control.DrawToBitmap(bitmap, bounds);

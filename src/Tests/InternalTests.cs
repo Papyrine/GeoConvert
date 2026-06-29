@@ -1,5 +1,3 @@
-using G = TestSupport;
-
 // Tests that reach into internal helpers (Tests has InternalsVisibleTo).
 public class InternalTests
 {
@@ -23,7 +21,7 @@ public class InternalTests
 
         byte[] bytes = [.. magic, .. header, .. feature];
         using var stream = new MemoryStream(bytes);
-        await Assert.That(G.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => FlatGeobuf.Read(stream))).IsTrue();
     }
 
     [Test]
@@ -96,7 +94,7 @@ public class InternalTests
         {
             new Feature(new LineString(points))
         };
-        var result = G.RoundtripStream(source, GeoFormat.FlatGeobuf);
+        var result = TestSupport.RoundtripStream(source, GeoFormat.FlatGeobuf);
         await Assert.That(((LineString)result.Features[0].Geometry!).Positions.Count).IsEqualTo(5000);
     }
 

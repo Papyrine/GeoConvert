@@ -1,11 +1,12 @@
 namespace GeoConvert.Web.Layout;
 
-public partial class MainLayout
+public partial class MainLayout : IDisposable
 {
     ThemeType currentTheme = ThemeType.Light;
     string? userAgent;
     DownloadSize? downloadSize;
     long? ramBytes;
+    PeriodicTimer? ramPoll;
 
     protected override async Task OnInitializedAsync()
     {
@@ -22,16 +23,54 @@ public partial class MainLayout
         }
 
         // appInfo.downloadSize waits for the load event before totalling the boot download, so resolve it
-        // off the first render rather than during init to avoid blocking the initial paint behind it.
+        // off the first render rather than during init to avoid blocking the initial paint behind it. It's
+        // the fixed boot payload, so — unlike RAM — it's sampled once and never repolled.
         downloadSize = await JSRuntime.InvokeAsync<DownloadSize>("appInfo.downloadSize");
 
+        await SampleRamAsync();
+        StateHasChanged();
+
+        // The WebAssembly heap grows as maps are read and rendered — and WASM linear memory never shrinks
+        // back — so the boot-time figure understates the real footprint the moment a map is loaded. Poll it
+        // so the footer tracks that high-water mark, repainting only when the number actually moves (so the
+        // poll costs nothing once the heap plateaus).
+        var poll = new PeriodicTimer(TimeSpan.FromSeconds(2));
+        ramPoll = poll;
+        _ = PollRamAsync(poll);
+    }
+
+    async Task PollRamAsync(PeriodicTimer timer)
+    {
+        try
+        {
+            while (await timer.WaitForNextTickAsync())
+            {
+                // Hop back onto the renderer's dispatcher: the tick resumes on a pool thread, but JS interop
+                // and StateHasChanged must run on the UI thread.
+                await InvokeAsync(async () =>
+                {
+                    var previous = ramBytes;
+                    await SampleRamAsync();
+                    if (ramBytes != previous)
+                    {
+                        StateHasChanged();
+                    }
+                });
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+            // Disposed mid-poll (page torn down); stop quietly.
+        }
+    }
+
+    async Task SampleRamAsync()
+    {
         var ram = await JSRuntime.InvokeAsync<long>("appInfo.ramBytes");
         if (ram > 0)
         {
             ramBytes = ram;
         }
-
-        StateHasChanged();
     }
 
     static string FormatMb(long bytes) =>
@@ -45,4 +84,7 @@ public partial class MainLayout
         await ThemePreferenceService.SaveThemeAsync(newTheme);
         await JSRuntime.InvokeVoidAsync("themeManager.applyTheme", newTheme.ToString());
     }
+
+    public void Dispose() =>
+        ramPoll?.Dispose();
 }

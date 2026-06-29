@@ -34,10 +34,13 @@ window.appInfo = {
     userAgent: function () {
         return navigator.userAgent;
     },
-    // Totals the app's boot download from the browser's Resource Timing data: encodedBodySize is the
-    // compressed bytes received over the wire, decodedBodySize the uncompressed bytes. Waits for the load
-    // event (and web fonts) so every framework/asset request is in the timeline before summing. All assets
-    // are same-origin, so the sizes are reported rather than zeroed for cross-origin opacity.
+    // Totals the app's boot download. Waits for the load event (and web fonts) so every framework/asset
+    // request has finished first. On GitHub Pages the coi.js service worker re-serves every response to add
+    // the cross-origin-isolation headers, and a service-worker-synthesised response reports its body sizes
+    // as 0 in Resource Timing (a known spec gap) — so when a SW controls the page, ask it for the byte
+    // totals it tallied while serving the load. Without a controlling SW (a host that sets the headers
+    // itself, or local dev) Resource Timing is accurate, so fall back to summing it: encodedBodySize is the
+    // compressed bytes over the wire, decodedBodySize the uncompressed bytes.
     downloadSize: async function () {
         if (document.readyState !== 'complete') {
             await new Promise(resolve => window.addEventListener('load', resolve, { once: true }));
@@ -45,6 +48,22 @@ window.appInfo = {
         try {
             await document.fonts.ready;
         } catch {
+        }
+
+        const controller = navigator.serviceWorker?.controller;
+        if (controller) {
+            const totals = await new Promise(resolve => {
+                const channel = new MessageChannel();
+                const timeout = setTimeout(() => resolve(null), 1000);
+                channel.port1.onmessage = event => {
+                    clearTimeout(timeout);
+                    resolve(event.data);
+                };
+                controller.postMessage({ type: 'downloadSize' }, [channel.port2]);
+            });
+            if (totals) {
+                return { zipped: totals.zipped, unzipped: totals.unzipped };
+            }
         }
 
         let zipped = 0;

@@ -11,13 +11,33 @@
 
 if (typeof window === 'undefined') {
     // ---- Service worker context ----
+
+    // Running byte totals for the current page load: the compressed transport size (Content-Length) and
+    // the decompressed size (counted as each body streams through below). The page reads these via
+    // postMessage for the footer's download figure — it can't take them from its own Resource Timing,
+    // because a service-worker-synthesised response reports body sizes as 0 (a known Resource Timing spec
+    // gap). Zeroed at each navigation so the totals cover the latest load, not an accumulation over reloads.
+    let bytesZipped = 0;
+    let bytesUnzipped = 0;
+
     self.addEventListener('install', () => self.skipWaiting());
     self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
+    self.addEventListener('message', event => {
+        if (event.data?.type === 'downloadSize') {
+            event.ports[0]?.postMessage({ zipped: bytesZipped, unzipped: bytesUnzipped });
+        }
+    });
     self.addEventListener('fetch', event => {
         const request = event.request;
         // A cross-origin "only-if-cached" request can't be re-issued, so leave it untouched.
         if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') {
             return;
+        }
+
+        // A navigation is the first request of a page load; reset the totals so they cover just this load.
+        if (request.mode === 'navigate') {
+            bytesZipped = 0;
+            bytesUnzipped = 0;
         }
 
         event.respondWith(
@@ -31,7 +51,27 @@ if (typeof window === 'undefined') {
                     const headers = new Headers(response.headers);
                     headers.set('Cross-Origin-Embedder-Policy', 'require-corp');
                     headers.set('Cross-Origin-Opener-Policy', 'same-origin');
-                    return new Response(response.body, {
+
+                    // 204/304/redirects carry no body to re-stream or measure.
+                    if (!response.body) {
+                        return new Response(response.body, {
+                            status: response.status,
+                            statusText: response.statusText,
+                            headers
+                        });
+                    }
+
+                    // Content-Length is the compressed transport size; the fetched body is already
+                    // decompressed, so counting it as it streams to the page gives the uncompressed size.
+                    // The TransformStream is a passthrough — it tallies bytes without buffering them.
+                    bytesZipped += Number(response.headers.get('content-length')) || 0;
+                    const counter = new TransformStream({
+                        transform(chunk, controller) {
+                            bytesUnzipped += chunk.byteLength;
+                            controller.enqueue(chunk);
+                        }
+                    });
+                    return new Response(response.body.pipeThrough(counter), {
                         status: response.status,
                         statusText: response.statusText,
                         headers

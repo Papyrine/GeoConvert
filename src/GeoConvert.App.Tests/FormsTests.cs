@@ -25,6 +25,51 @@ public class FormsTests
         Verify(WinFormsSnapshot.Render(() => new DiffForm(), 1000, 680, dpiPercent / 100f))
             .UseParameters(dpiPercent);
 
+    // The main window with the bundled sample world map loaded — the lead documentation screenshot. Drives
+    // the real load to completion (the same path File ▸ Load sample world map takes) and snapshots it; the
+    // file label reads a stable "borders.fgb · …" since it shows only the file name, not the full path.
+    [Test]
+    public Task MainWindowWithMap()
+    {
+        var sample = SampleMap.Locate() ?? throw new InvalidOperationException(
+            "The bundled sample world map was not staged next to the test exe (MapBundle.World).");
+        return Verify(
+            WinFormsSnapshot.RenderAfter(
+                () => new MainForm(SeededSettings(), null),
+                form => form.LoadAsync(sample),
+                1000,
+                680));
+    }
+
+    // The populated diff window, used as the documentation screenshots (referenced from nuget-readme.md).
+    // A verified snapshot rather than a live screen grab: deterministic, regenerated in CI, reviewed on
+    // change, and free of the PrintWindow capture artefacts (e.g. clipped edge buttons) a screen grab had.
+    [Test]
+    public Task DiffOverlay() => Verify(RenderDiff(DiffMode.Overlay));
+
+    [Test]
+    public Task DiffSideBySide() => Verify(RenderDiff(DiffMode.SideBySide));
+
+    static Bitmap RenderDiff(DiffMode mode)
+    {
+        // Load the demo maps by bare name so the path boxes read "before.geojson" / "after.geojson"
+        // (deterministic) instead of an absolute path; the fixtures sit next to the test exe.
+        var previous = Directory.GetCurrentDirectory();
+        Directory.SetCurrentDirectory(AppContext.BaseDirectory);
+        try
+        {
+            return WinFormsSnapshot.RenderAfter(
+                () => new DiffForm(mode),
+                form => form.LoadAndRenderAsync("before.geojson", "after.geojson"),
+                1000,
+                680);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previous);
+        }
+    }
+
     [Test]
     public Task StatusBarAfterLoad()
     {

@@ -18,4 +18,4 @@ GeoConverter.Write(collection, "roads.fgb");
 
 A `geoconvert` command line tool is also available as a separate package: `GeoConvert.Cli`.
 
-See the [GitHub repo](https://github.com/SimonCropp/GeoConvert) for full documentation, samples, per-format limits, and PNG rendering options.
+See the [GitHub repo](https://github.com/Papyrine/GeoConvert) for full documentation, samples, per-format limits, and PNG rendering options.

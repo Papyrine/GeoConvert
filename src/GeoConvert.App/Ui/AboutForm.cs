@@ -7,7 +7,7 @@ namespace GeoConvert.App;
 /// </summary>
 sealed class AboutForm : Form
 {
-    const string projectUrl = "https://github.com/SimonCropp/GeoConvert";
+    const string projectUrl = "https://github.com/Papyrine/GeoConvert";
 
     public AboutForm()
     {

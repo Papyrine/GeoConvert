@@ -22,4 +22,4 @@ SkiaRenderer.RenderPng(collection, "world.png", new()
 The API mirrors `MapRenderer.RenderPng` (single collection or a stacked list, to `byte[]`, a path, or
 a `Stream`) and honours the same `RenderOptions`. Labels are drawn with Skia's default typeface.
 
-See the [GitHub repo](https://github.com/SimonCropp/GeoConvert) for full documentation.
+See the [GitHub repo](https://github.com/Papyrine/GeoConvert) for full documentation.

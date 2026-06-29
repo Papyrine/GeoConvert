@@ -40,6 +40,13 @@ sealed class DiffForm : Form
     {
     }
 
+    // Test seam: build the window with the mode preset (so the toolbar's Mode combo matches) but no paths,
+    // so OnShown doesn't auto-load. A snapshot then populates it deterministically via LoadAndRenderAsync.
+    internal DiffForm(DiffMode mode)
+        : this(new(), mode, MapDiff.DefaultColorA, MapDiff.DefaultColorB, null, null)
+    {
+    }
+
     DiffForm(RenderSettings settings, DiffMode mode, Rgba colorA, Rgba colorB, string? pathA, string? pathB)
     {
         this.settings = settings;
@@ -272,6 +279,15 @@ sealed class DiffForm : Form
         await LoadAsync(pathA!, isFirst: true, render: false);
         await LoadAsync(pathB!, isFirst: false, render: false);
         await RenderAsync();
+    }
+
+    // Test seam: load both maps and render the diff, awaitable to completion so a snapshot captures the
+    // fully populated window. Mirrors the OnShown auto-load but driven explicitly.
+    internal Task LoadAndRenderAsync(string firstPath, string secondPath)
+    {
+        pathA = firstPath;
+        pathB = secondPath;
+        return LoadBothAsync();
     }
 
     async Task LoadAsync(string path, bool isFirst, bool render = true)

@@ -28,4 +28,4 @@ font.
 > and personal use, but commercial use may require a paid license. See
 > [sixlabors.com](https://sixlabors.com/pricing/). GeoConvert and GeoConvert.Skia carry no such terms.
 
-See the [GitHub repo](https://github.com/SimonCropp/GeoConvert) for full documentation.
+See the [GitHub repo](https://github.com/Papyrine/GeoConvert) for full documentation.

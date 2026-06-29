@@ -3,7 +3,7 @@
   <!--
     A WinForms GUI that is also shipped as a .NET tool. The packaging mirrors MsOfficeDiff
     (https://github.com/SimonCropp/MsOfficeDiff): the WindowsDesktop SDK gives us WinForms, and the two
-    Target hacks below let the project keep a *plain* TFM (net10.0 / net11.0, no '-windows' suffix) so it
+    Target hacks below let the project keep a *plain* TFM (net10.0, no '-windows' suffix) so it
     packs as an ordinary framework-dependent dotnet tool. Unlike MsOfficeDiff this stays inside
     GeoConvert's no-third-party-dependency discipline: argument parsing is hand-rolled (see Cli.cs) and
     settings use System.Text.Json, so no CliFx / Serilog / DI packages are pulled in. The Skia and
@@ -12,7 +12,7 @@
   -->
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFrameworks>net10.0;net11.0</TargetFrameworks>
+    <TargetFramework>net10.0</TargetFramework>
     <UseWindowsForms>true</UseWindowsForms>
     <Nullable>enable</Nullable>
     <NoWarn>$(NoWarn);CA1416;NETSDK1137</NoWarn>

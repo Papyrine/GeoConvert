@@ -1,5 +1,3 @@
-namespace GeoConvert.App.Tests;
-
 // WinForms rendering wants a single UI thread, so keep these off the parallel runner.
 [NotInParallel]
 public class OptionsPanelTests

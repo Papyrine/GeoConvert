@@ -1,5 +1,3 @@
-namespace GeoConvert.App.Tests;
-
 [NotInParallel]
 public class FormsTests
 {
@@ -8,11 +6,15 @@ public class FormsTests
     [Test]
     [Arguments(100)]
     [Arguments(150)]
-    public Task MainWindow(int dpiPercent) =>
+    public async Task MainWindow(int dpiPercent)
+    {
+        using var file = TempFile.Create("json");
         // The whole main window: menu, the "no map loaded" bar, the (empty) preview and the fixed-width
         // options column on the right.
-        Verify(WinFormsSnapshot.Render(() => new MainForm(SeededSettings(), null), 1000, 680, dpiPercent / 100f))
+        await Verify(WinFormsSnapshot.Render(
+                () => new MainForm(SeededSettings(file), null), 1000, 680, dpiPercent / 100f))
             .UseParameters(dpiPercent);
+    }
 
     [Test]
     [Arguments(100)]
@@ -35,10 +37,12 @@ public class FormsTests
         // stable "Loaded sample.fgb". RunToCompletion blocks until the load has read the file, so the temp
         // directory can be disposed as the method returns.
         var path = Path.Combine(directory, "sample.fgb");
+
+        using var file = TempFile.Create("json");
         GeoConverter.Write(SampleMaps.A(), path, GeoFormat.FlatGeobuf);
         return Verify(
             WinFormsSnapshot.RunToCompletion(
-                () => new MainForm(SeededSettings(), null),
+                () => new MainForm(SeededSettings(file), null),
                 form => form.LoadAsync(path),
                 form => new
                 {
@@ -58,12 +62,16 @@ public class FormsTests
         Verify(WinFormsSnapshot.Render(() => new AboutForm(), 420, 220, dpiPercent / 100f))
             .UseParameters(dpiPercent);
 
-    static SettingsManager SeededSettings()
+    static SettingsManager SeededSettings(string settingsPath)
     {
         // Pre-mark the first-run prompt as shown so the briefly-shown MainForm doesn't pop the (blocking)
         // association MessageBox. A throwaway temp path keeps it away from the real user settings.
-        var manager = new SettingsManager(Path.Combine(Path.GetTempPath(), "GeoConvert.App.Tests", "settings.json"));
-        manager.Write(new() { AssociationsPrompted = true });
+        var manager = new SettingsManager(settingsPath);
+        manager.Write(
+            new()
+            {
+                AssociationsPrompted = true
+            });
         return manager;
     }
 }

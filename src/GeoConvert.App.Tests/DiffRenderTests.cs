@@ -1,5 +1,3 @@
-namespace GeoConvert.App.Tests;
-
 public class DiffRenderTests
 {
     // A small fixed pixel size keeps the snapshots compact and deterministic.

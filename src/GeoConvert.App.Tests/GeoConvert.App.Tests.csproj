@@ -2,9 +2,9 @@
 
   <PropertyGroup>
     <!-- A '-windows' TFM (plus UseWindowsForms) so WinForms and Verify.WinForms are available; the app
-         it tests is referenced at its net11.0 build. Test projects don't pack, so no tool-packaging hack
+         it tests is referenced at its net10.0 build. Test projects don't pack, so no tool-packaging hack
          is needed here (unlike the app itself). -->
-    <TargetFramework>net11.0-windows</TargetFramework>
+    <TargetFramework>net10.0-windows</TargetFramework>
     <OutputType>Exe</OutputType>
     <UseWindowsForms>true</UseWindowsForms>
     <IsPackable>false</IsPackable>

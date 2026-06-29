@@ -1,5 +1,3 @@
-namespace GeoConvert.App.Tests;
-
 /// <summary>
 /// Renders a WinForms control to a <see cref="Bitmap"/> for Verify to snapshot. WinForms requires an STA
 /// thread, so the control is created, laid out and drawn on a dedicated one; the resulting bitmap is
@@ -173,8 +171,13 @@ static class WinFormsSnapshot
             return;
         }
 
-        // Match the real app's themed rendering (ApplicationConfiguration.Initialize does this).
-        Application.EnableVisualStyles();
+        // Deliberately do NOT call Application.EnableVisualStyles(). Themed (Aero) rendering delegates radio
+        // buttons, check boxes and push buttons to the OS theme engine, which paints them differently from
+        // one desktop session to the next — a blue themed radio dot on an interactive desktop vs a black
+        // classic dot on a headless/CI agent — so the snapshots flapped purely on which machine ran them.
+        // Classic (non-visual-styles) controls are drawn by fixed GDI code against the standard system
+        // palette, identically everywhere; these tests exist to catch DPI/layout breaks, which classic
+        // rendering still shows. SetCompatibleTextRenderingDefault stays so text metrics match the app.
         Application.SetCompatibleTextRenderingDefault(false);
         stylesEnabled = true;
     }

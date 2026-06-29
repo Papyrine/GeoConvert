@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0;net11.0</TargetFrameworks>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>true</IsPackable>
     <PackageReadmeFile>readme.md</PackageReadmeFile>
     <Description>Optional SixLabors.ImageSharp-backed PNG render backend for GeoConvert. Rasterizes the same projection, styling and labelling pipeline as the built-in renderer through ImageSharp. Unlike GeoConvert itself, this package takes a third-party dependency (SixLabors.ImageSharp, under the Six Labors Split License).</Description>

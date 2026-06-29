@@ -1,4 +1,4 @@
-namespace GeoConvert.App.Tests;
+using Point = GeoConvert.Point;
 
 /// <summary>Small, deterministic in-memory maps used across the snapshot tests.</summary>
 static class SampleMaps

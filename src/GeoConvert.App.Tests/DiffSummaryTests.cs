@@ -1,5 +1,3 @@
-namespace GeoConvert.App.Tests;
-
 public class DiffSummaryTests
 {
     [Test]

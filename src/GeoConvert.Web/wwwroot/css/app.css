@@ -514,6 +514,13 @@ footer a:hover {
     text-decoration: underline;
 }
 
+.footer-version,
+.footer-size,
+.footer-ram {
+    margin-left: 0.5rem;
+    opacity: 0.7;
+}
+
 @media (max-width: 768px) {
     header {
         display: flex;
@@ -558,5 +565,10 @@ footer a:hover {
 
     .convert-btn {
         width: 100%;
+    }
+
+    /* The footer row is tight on a phone; drop the payload-size figure to keep it readable. */
+    .footer-size {
+        display: none;
     }
 }

@@ -17,5 +17,30 @@ static class ModuleInitializer
                 "blazor:elementreference=\"[^\"]*\"",
                 "blazor:elementreference=\"scrubbed\"",
                 RegexOptions.IgnoreCase));
+
+        // The footer carries three figures that vary from one capture to the next; pin each before the
+        // page-HTML snapshot compares. The version comes from AssemblyInformationalVersion, which the SDK
+        // suffixes with the build's commit SHA; the download total is measured from the browser's Resource
+        // Timing data, so it tracks the published bundle's byte size; the RAM figure is the live WebAssembly
+        // heap size. The component (bUnit) snapshots have no footer, so these patterns simply don't match there.
+        VerifierSettings.AddScrubber(
+            "html",
+            builder =>
+            {
+                var html = Regex.Replace(
+                    builder.ToString(),
+                    "(<span class=\"footer-version\">).*?(</span>)",
+                    "$1scrubbed$2");
+                html = Regex.Replace(
+                    html,
+                    "(<span class=\"footer-size\"[^>]*>).*?(</span>)",
+                    "$1scrubbed$2");
+                html = Regex.Replace(
+                    html,
+                    "(<span class=\"footer-ram\"[^>]*>).*?(</span>)",
+                    "$1scrubbed$2");
+                builder.Clear();
+                builder.Append(html);
+            });
     }
 }

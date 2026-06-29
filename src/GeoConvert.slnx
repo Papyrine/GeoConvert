@@ -10,6 +10,7 @@
   <Project Path="Benchmarks/Benchmarks.csproj" />
   <Project Path="Tests/Tests.csproj" />
   <Folder Name="/SolutionItems/">
+    <File Path="../global.json" />
     <File Path="../readme.md" />
     <File Path="appveyor.yml" />
     <File Path="coverage-check.ps1" />

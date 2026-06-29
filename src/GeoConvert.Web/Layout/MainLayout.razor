@@ -21,5 +21,14 @@
 </div>
 
 <footer>
-    <p>Powered by <a href="https://github.com/Papyrine/GeoConvert" target="_blank">GeoConvert</a> — no data leaves your device</p>
+    Powered by <a href="https://github.com/Papyrine/GeoConvert" target="_blank">GeoConvert</a> — no data leaves your device
+    <span class="footer-version">v@(AppInfo.Version)</span>
+    @if (downloadSize is { } size)
+    {
+        <span class="footer-size" title="Total app download — compressed over the wire / uncompressed">@FormatMb(size.Zipped) zipped · @FormatMb(size.Unzipped) unzipped</span>
+    }
+    @if (ramBytes is { } ram)
+    {
+        <span class="footer-ram" title="Approximate memory the app is using (WebAssembly heap)">@FormatMb(ram) RAM</span>
+    }
 </footer>

@@ -77,7 +77,13 @@ if (typeof window === 'undefined') {
                         headers
                     });
                 })
-                .catch(error => console.error(error)));
+                // Re-throw rather than returning undefined: respondWith(undefined) is invalid and
+                // aborts the request unrecoverably (the confusing "non-Response value 'undefined'"
+                // error). A rejected promise surfaces as an ordinary, retryable network failure instead.
+                .catch(error => {
+                    console.error(error);
+                    throw error;
+                }));
     });
 } else {
     // ---- Page context ----

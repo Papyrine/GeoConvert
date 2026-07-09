@@ -4,8 +4,8 @@
     
     <link rel="icon" type="image/png" href="favicon.png">
     <base href="/">
-    <!-- Establishes cross-origin isolation (SharedArrayBuffer) for the multithreaded WASM runtime.
-         Must run before blazor.webassembly.js so isolation is in place before the runtime boots. -->
+    <!-- Establishes cross-origin isolation (SharedArrayBuffer) for the multithreaded WASM runtime and
+         publishes window.crossOriginIsolation, which gates the runtime boot at the bottom of the body. -->
     <script src="coi.js"></script>
     <!-- Preload critical resources -->
     <link rel="preload" href="css/app.css" as="style">
@@ -42,10 +42,24 @@
         <a href="" class="reload">Reload</a>
         <a class="dismiss">X</a>
     </div>
-    <script src="_framework/blazor.webassembly.js"></script>
+    <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     <script src="js/interop.js"></script>
     <script>
         window.themeManager.initializeTheme();
+
+        // Hold the boot until coi.js reports cross-origin isolation. The multithreaded runtime asserts on
+        // a missing SharedArrayBuffer, and on a first visit isolation only arrives once coi.js has
+        // installed its service worker and reloaded — autostart would race that and abort.
+        window.crossOriginIsolation.then(isolated => {
+            if (isolated) {
+                return Blazor.start();
+            }
+
+            document.getElementById('app').innerHTML =
+                '<div class="loading"><p>GeoConvert needs cross-origin isolation (SharedArrayBuffer), ' +
+                'which this browser or host is not providing. Try a current version of Chrome, Edge, ' +
+                'Firefox or Safari, with service workers enabled.</p></div>';
+        });
     </script>
 
 

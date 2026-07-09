@@ -5,9 +5,11 @@
 //   Cross-Origin-Opener-Policy:   same-origin
 //   Cross-Origin-Embedder-Policy: require-corp
 // GitHub Pages (where this app is hosted) can't set response headers, so a service worker re-serves
-// every response with them. When the app is already isolated (e.g. a dev/test server that sets the
-// headers itself), the page-side code below does nothing. This is the well-known coi-serviceworker
-// technique (Guido Zuidhof, MIT), trimmed to what this app needs.
+// every response with them. Installing that worker takes a reload to take effect, so the page-side code
+// below publishes `window.crossOriginIsolation` for index.html to wait on before starting the runtime.
+// When the app is already isolated (e.g. a dev/test server that sets the headers itself) it resolves
+// straight away. This is the well-known coi-serviceworker technique (Guido Zuidhof, MIT), trimmed to
+// what this app needs.
 
 if (typeof window === 'undefined') {
     // ---- Service worker context ----
@@ -87,31 +89,62 @@ if (typeof window === 'undefined') {
     });
 } else {
     // ---- Page context ----
-    (() => {
-        // Already isolated (the host set the headers), or no SW support / insecure context: nothing to do.
-        if (window.crossOriginIsolated || !window.isSecureContext || !navigator.serviceWorker) {
-            return;
+    //
+    // Resolves true once the page is cross-origin isolated, and false when isolation can't be reached —
+    // so the caller can say so plainly instead of letting the runtime abort on a missing SharedArrayBuffer.
+    // It stays pending while a reload is on its way, because the page is about to be replaced and nothing
+    // should boot into it. index.html gates Blazor.start() on this.
+    window.crossOriginIsolation = (() => {
+        const swUrl = document.currentScript.src;
+
+        // Already isolated: the host sets the headers itself (the test harness does). No worker needed,
+        // and the reload budget below can start fresh.
+        if (window.crossOriginIsolated) {
+            sessionStorage.removeItem('coiReloads');
+            return Promise.resolve(true);
         }
 
-        // Guard against a reload loop if isolation still can't be reached after one reload.
-        if (sessionStorage.getItem('coiReloaded')) {
-            return;
+        // No service worker to install, so the headers can never arrive.
+        if (!window.isSecureContext || !navigator.serviceWorker) {
+            return Promise.resolve(false);
         }
 
-        navigator.serviceWorker
-            .register(document.currentScript.src)
+        // Only a reload can put the worker's headers on the document, so cap how many we spend: if the
+        // page comes back still un-isolated, reloading again would loop forever.
+        const reloads = Number(sessionStorage.getItem('coiReloads')) || 0;
+        if (reloads >= 2) {
+            return Promise.resolve(false);
+        }
+
+        // A registration that never activates would otherwise leave the page on its loading spinner.
+        const withTimeout = promise => Promise.race([
+            promise,
+            new Promise(resolve => setTimeout(() => resolve(null), 10_000))
+        ]);
+
+        return navigator.serviceWorker
+            .register(swUrl)
+            // Wait for `ready`, which resolves once a worker is *active*. The tempting signal, the
+            // registration's `updatefound`, fires when the worker merely starts *installing* — reloading
+            // that early races activation, and a navigation that finds no active worker isn't intercepted,
+            // so the page comes back without the headers and boots un-isolated.
+            .then(() => withTimeout(navigator.serviceWorker.ready))
             .then(registration => {
-                // First registration: the SW isn't controlling this page yet, so reload once to let it.
-                if (registration.active && !navigator.serviceWorker.controller) {
-                    sessionStorage.setItem('coiReloaded', '1');
-                    window.location.reload();
+                if (registration === null) {
+                    return false;
                 }
 
-                registration.addEventListener('updatefound', () => {
-                    sessionStorage.setItem('coiReloaded', '1');
-                    window.location.reload();
-                });
+                // An active worker in scope controls the *next* navigation on its own (clients.claim()
+                // only matters for pages already loaded), so the reloaded page arrives with COOP/COEP.
+                sessionStorage.setItem('coiReloads', String(reloads + 1));
+                window.location.reload();
+
+                // Deliberately never settles: this page is being torn down.
+                return new Promise(() => { });
             })
-            .catch(error => console.error(error));
+            .catch(error => {
+                console.error(error);
+                return false;
+            });
     })();
 }

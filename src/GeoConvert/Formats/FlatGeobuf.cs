@@ -113,7 +113,7 @@ public static class FlatGeobuf
         var feature = new Feature();
         if (table.GetTable(featureGeometry) is { } geometry)
         {
-            feature.Geometry = ReadGeometry(geometry, fallbackType);
+            feature.Geometry = ReadGeometry(geometry, fallbackType, 1);
         }
 
         var properties = table.GetByteVector(featureProperties);
@@ -125,8 +125,15 @@ public static class FlatGeobuf
         return feature;
     }
 
-    static Geometry ReadGeometry(FlatBufferTable table, byte fallbackType)
+    static Geometry ReadGeometry(FlatBufferTable table, byte fallbackType, int depth)
     {
+        // A part's table offset is signed, so a crafted file can point a part back at its own parent.
+        // Without this cap that cycle recurses until the stack overflows.
+        if (depth > Nesting.MaxDepth)
+        {
+            throw new GeoConvertException($"FlatGeobuf geometry nesting exceeds {Nesting.MaxDepth} levels.");
+        }
+
         var fgbType = table.GetByte(geometryType, fallbackType);
         switch (fgbType)
         {
@@ -142,21 +149,21 @@ public static class FlatGeobuf
             case 5: // MultiLineString
                 return new MultiLineString([.. SplitRings(table).Select(_ => new LineString(_))]);
             case 6: // MultiPolygon
-                return new MultiPolygon([.. ReadParts(table).Cast<Polygon>()]);
+                return new MultiPolygon([.. ReadParts(table, depth).Cast<Polygon>()]);
             case 7: // GeometryCollection
-                return new GeometryCollection(ReadParts(table));
+                return new GeometryCollection(ReadParts(table, depth));
             default:
                 throw new GeoConvertException($"Unsupported FlatGeobuf geometry type {fgbType}.");
         }
     }
 
-    static List<Geometry> ReadParts(FlatBufferTable table)
+    static List<Geometry> ReadParts(FlatBufferTable table, int depth)
     {
         var parts = new List<Geometry>();
         var count = table.VectorLength(geometryParts);
         for (var i = 0; i < count; i++)
         {
-            parts.Add(ReadGeometry(table.GetTableElement(geometryParts, i), 0));
+            parts.Add(ReadGeometry(table.GetTableElement(geometryParts, i), 0, depth + 1));
         }
 
         return parts;

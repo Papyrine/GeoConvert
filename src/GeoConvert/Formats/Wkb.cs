@@ -55,7 +55,7 @@ public static class Wkb
             var collection = new FeatureCollection();
             while (!cursor.AtEnd)
             {
-                collection.Add(new Feature(ReadGeometry(ref cursor)));
+                collection.Add(new Feature(ReadGeometry(ref cursor, 1)));
                 progress?.Feature();
             }
 
@@ -79,7 +79,7 @@ public static class Wkb
         try
         {
             var cursor = new Cursor(bytes);
-            return ReadGeometry(ref cursor);
+            return ReadGeometry(ref cursor, 1);
         }
         catch (GeoConvertException)
         {
@@ -91,8 +91,13 @@ public static class Wkb
         }
     }
 
-    static Geometry ReadGeometry(ref Cursor cursor)
+    static Geometry ReadGeometry(ref Cursor cursor, int depth)
     {
+        if (depth > Nesting.MaxDepth)
+        {
+            throw new GeoConvertException($"WKB geometry nesting exceeds {Nesting.MaxDepth} levels.");
+        }
+
         var little = cursor.ReadByte() == 1;
         var rawType = cursor.ReadUInt32(little);
 
@@ -131,7 +136,7 @@ public static class Wkb
                 var positions = new List<Position>((int)count);
                 for (var i = 0; i < count; i++)
                 {
-                    positions.Add(ExpectSubGeometry<Point>(ReadGeometry(ref cursor), "MultiPoint").Coordinate);
+                    positions.Add(ExpectSubGeometry<Point>(ReadGeometry(ref cursor, depth + 1), "MultiPoint").Coordinate);
                 }
 
                 return new MultiPoint(positions);
@@ -142,7 +147,7 @@ public static class Wkb
                 var lines = new List<LineString>((int)count);
                 for (var i = 0; i < count; i++)
                 {
-                    lines.Add(ExpectSubGeometry<LineString>(ReadGeometry(ref cursor), "MultiLineString"));
+                    lines.Add(ExpectSubGeometry<LineString>(ReadGeometry(ref cursor, depth + 1), "MultiLineString"));
                 }
 
                 return new MultiLineString(lines);
@@ -153,7 +158,7 @@ public static class Wkb
                 var polygons = new List<Polygon>((int)count);
                 for (var i = 0; i < count; i++)
                 {
-                    polygons.Add(ExpectSubGeometry<Polygon>(ReadGeometry(ref cursor), "MultiPolygon"));
+                    polygons.Add(ExpectSubGeometry<Polygon>(ReadGeometry(ref cursor, depth + 1), "MultiPolygon"));
                 }
 
                 return new MultiPolygon(polygons);
@@ -164,7 +169,7 @@ public static class Wkb
                 var geometries = new List<Geometry>((int)count);
                 for (var i = 0; i < count; i++)
                 {
-                    geometries.Add(ReadGeometry(ref cursor));
+                    geometries.Add(ReadGeometry(ref cursor, depth + 1));
                 }
 
                 return new GeometryCollection(geometries);

@@ -5,7 +5,7 @@ sealed class WktParser(string text)
 
     public Geometry ParseGeometry()
     {
-        var geometry = ParseTagged();
+        var geometry = ParseTagged(1);
         SkipWhitespace();
         if (pos == text.Length)
         {
@@ -15,8 +15,13 @@ sealed class WktParser(string text)
         throw Error("unexpected trailing characters");
     }
 
-    Geometry ParseTagged()
+    Geometry ParseTagged(int depth)
     {
+        if (depth > Nesting.MaxDepth)
+        {
+            throw Error($"nesting exceeds {Nesting.MaxDepth} levels");
+        }
+
         var keyword = ReadWord();
         var hasZ = false;
         var hasM = false;
@@ -42,7 +47,7 @@ sealed class WktParser(string text)
             "MULTIPOINT" => ReadMultiPoint(hasZ, hasM),
             "MULTILINESTRING" => ReadMultiLineString(hasZ, hasM),
             "MULTIPOLYGON" => ReadMultiPolygon(hasZ, hasM),
-            "GEOMETRYCOLLECTION" => ReadGeometryCollection(),
+            "GEOMETRYCOLLECTION" => ReadGeometryCollection(depth),
             _ => throw Error($"unknown geometry keyword '{keyword}'"),
         };
     }
@@ -110,13 +115,13 @@ sealed class WktParser(string text)
         return new(polygons);
     }
 
-    GeometryCollection ReadGeometryCollection()
+    GeometryCollection ReadGeometryCollection(int depth)
     {
         Expect('(');
         var geometries = new List<Geometry>();
         do
         {
-            geometries.Add(ParseTagged());
+            geometries.Add(ParseTagged(depth + 1));
         }
         while (TryConsumeComma());
 

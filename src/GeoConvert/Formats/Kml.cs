@@ -25,7 +25,7 @@ public static class Kml
             var features = new FeatureCollection();
             reader.MoveToContent();
             // The first <Document> we encounter populates the root; nested Documents become child layers.
-            ScanContainer(reader, features, isRoot: true, progress);
+            ScanContainer(reader, features, isRoot: true, progress, depth: 1);
             return features;
         }
         catch (GeoConvertException)
@@ -40,7 +40,13 @@ public static class Kml
 
     // Reads the children of an element (<kml>, <Document>, or <Folder>), populating `target` with
     // its placemarks, folders, name and description.
-    static void ScanContainer(XmlReader reader, FeatureCollection target, bool isRoot, ProgressReporter? progress) =>
+    static void ScanContainer(XmlReader reader, FeatureCollection target, bool isRoot, ProgressReporter? progress, int depth)
+    {
+        if (depth > Nesting.MaxDepth)
+        {
+            throw new GeoConvertException($"KML container nesting exceeds {Nesting.MaxDepth} levels.");
+        }
+
         Xml.ReadChildren(
             reader,
             () =>
@@ -52,17 +58,17 @@ public static class Kml
                         progress?.Feature();
                         break;
                     case "Folder":
-                        target.Children.Add(ReadContainer(reader, progress));
+                        target.Children.Add(ReadContainer(reader, progress, depth + 1));
                         break;
                     case "Document":
                         if (isRoot)
                         {
                             // First Document under <kml> is the root layer itself, not a child.
-                            ScanContainer(reader, target, isRoot: false, progress);
+                            ScanContainer(reader, target, isRoot: false, progress, depth + 1);
                         }
                         else
                         {
-                            target.Children.Add(ReadContainer(reader, progress));
+                            target.Children.Add(ReadContainer(reader, progress, depth + 1));
                         }
 
                         break;
@@ -77,11 +83,12 @@ public static class Kml
                         break;
                 }
             });
+    }
 
-    static FeatureCollection ReadContainer(XmlReader reader, ProgressReporter? progress)
+    static FeatureCollection ReadContainer(XmlReader reader, ProgressReporter? progress, int depth)
     {
         var features = new FeatureCollection();
-        ScanContainer(reader, features, isRoot: false, progress);
+        ScanContainer(reader, features, isRoot: false, progress, depth);
         return features;
     }
 
@@ -108,7 +115,7 @@ public static class Kml
                     case "LinearRing":
                     case "Polygon":
                     case "MultiGeometry":
-                        var geometry = ReadGeometry(reader);
+                        var geometry = ReadGeometry(reader, 1);
                         // first geometry wins
                         feature.Geometry ??= geometry;
                         break;
@@ -150,14 +157,21 @@ public static class Kml
             }
         });
 
-    static Geometry ReadGeometry(XmlReader reader) =>
-        reader.LocalName switch
+    static Geometry ReadGeometry(XmlReader reader, int depth)
+    {
+        if (depth > Nesting.MaxDepth)
+        {
+            throw new GeoConvertException($"KML geometry nesting exceeds {Nesting.MaxDepth} levels.");
+        }
+
+        return reader.LocalName switch
         {
             "Point" => ReadPoint(reader),
             "LineString" or "LinearRing" => new LineString(ReadCoordinatesElement(reader)),
             "Polygon" => ReadPolygon(reader),
-            _ => ReadMultiGeometry(reader), // MultiGeometry
+            _ => ReadMultiGeometry(reader, depth), // MultiGeometry
         };
+    }
 
     static Point ReadPoint(XmlReader reader)
     {
@@ -201,7 +215,7 @@ public static class Kml
         return positions;
     }
 
-    static Geometry ReadMultiGeometry(XmlReader reader)
+    static Geometry ReadMultiGeometry(XmlReader reader, int depth)
     {
         var children = new List<Geometry>();
         Xml.ReadChildren(reader, () =>
@@ -213,7 +227,7 @@ public static class Kml
                 case "LinearRing":
                 case "Polygon":
                 case "MultiGeometry":
-                    children.Add(ReadGeometry(reader));
+                    children.Add(ReadGeometry(reader, depth + 1));
                     break;
                 default:
                     reader.Skip();

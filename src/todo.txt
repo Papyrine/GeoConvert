@@ -1,24 +1,4 @@
 
-
-## 3. Nested WKT kills the process (uncatchable stack overflow)
-
-`src/GeoConvert/Internal/WktParser.cs:113-119`
-
-`ParseTagged` → `ReadGeometryCollection` → `ParseTagged` has no depth cap.
-
-```
-depth  1000: parsed OK
-depth 50000: Stack overflow.   <- process terminated, uncatchable
-```
-
-GeoJSON and TopoJSON are incidentally protected by `JsonDocument`'s default 64-level max depth.
-WKT has nothing. Reachable from any `.wkt` input and from a WKT cell in a CSV
-(`Csv.cs:68` → `Wkt.ParseGeometry`). `Kml.ReadMultiGeometry` (`Kml.cs:204`) has the same class of
-issue on nested `<MultiGeometry>`.
-
-**Fix:** thread a depth counter through `ParseTagged`/`ReadGeometryCollection` and throw
-`GeoConvertException` past a cap (64, to match `JsonDocument`).
-
 ## 4. A 32-byte `.dbf` allocates 8 GiB
 
 `src/GeoConvert/Internal/Dbf.cs:28` and `:65`
@@ -103,37 +83,6 @@ of them. Structural change, not a tweak. Largest single win available.
   optimized to avoid this (the reused `propertyBuffer` at `:281`/`:449`). Read the properties in
   place from the backing array via `BinaryPrimitives`.
 
-## Audited and clean — don't re-check
-
-- **Culture sensitivity.** Every numeric parse/format site (KML, GPX, WKT, CSV, SVG, DBF, Scalars,
-  JsonValue) passes `InvariantCulture`; JSON goes through `Utf8JsonWriter`/`JsonElement`, invariant
-  by construction. (`Position.ToString()` is culture-sensitive but is debug-only, on no
-  serialization path.)
-- **Stream ownership.** Every writer/reader wraps the caller's stream with `leaveOpen: true`.
-- **KMZ.** Read never extracts to disk, so no Zip-Slip. Disposal order is correct.
-- **Snappy.** Tag/literal/length decoding correct; `CopyBack`'s byte-by-byte forward copy is the
-  correct LZ77 overlap semantics.
-- **Thrift compact.** Field-delta, bool-as-type-nibble, list-header `nibble==15` boundary, zigzag,
-  stop-field all correct.
-- **FlatBuffers.** `Prep` alignment, vtable soffset back-patching, offset math match the canonical
-  algorithm.
-- **Rasterizer blending.** The SIMD translucent-span path matches the scalar path bit-for-bit.
-  Even-odd half-open crossing rule and 4-sub-sample coverage sum interior pixels to exactly 1.0.
-  `AddSpan` clipping keeps all writes in bounds.
-- **NaN/Infinity.** The projections all clamp (WebMercator ±85.0511°, Goode/Lambert ±89.999°), so
-  non-finite values can't reach the rasterizer. Minor asymmetry: `SvgSurface.cs:182` would emit
-  `"NaN"` given a non-finite input coordinate *plus* an explicit `RenderOptions.Bounds` (which
-  bypasses the `Envelope.IsEmpty` check); the PNG path silently drops it instead.
-- **Douglas–Peucker / Visvalingam.** Both use an explicit `Stack`, not recursion — no
-  stack-overflow exposure. Squared-distance use is consistent; degenerate zero-length chords are
-  handled. Visvalingam's lazy-deletion stale check is sound.
-- **`Ring.SignedArea`.** The `% ring.Count` wrap makes shoelace correct for closed and unclosed
-  rings alike.
-- **`Position`.** A `readonly record struct`, so the junction `HashSet<Position>` gets value
-  equality with no boxing.
-- **PNG.** Row buffers allocated once, not per row; CRC covers type+data correctly.
-- **Shapefile writer.** Endianness, 1-based record numbers, 16-bit-word content lengths, `.shx`
-  offsets all correct.
 
 ## Lower confidence — worth a look, not verified
 

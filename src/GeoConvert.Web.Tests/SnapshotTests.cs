@@ -403,8 +403,8 @@ public class SnapshotTests
         // render; wait for them so the captured HTML/PNG always includes them rather than racing a partial
         // footer. Match on Attached, not the default Visible, since the payload size is display:none at the
         // mobile viewport — it's still in the DOM, which is all we need to know the interop has completed.
-        await page.WaitForSelectorAsync(".footer-size", new() { State = WaitForSelectorState.Attached });
-        await page.WaitForSelectorAsync(".footer-ram", new() { State = WaitForSelectorState.Attached });
+        await page.WaitForSelectorAsync(".footer-size", new() {State = WaitForSelectorState.Attached});
+        await page.WaitForSelectorAsync(".footer-ram", new() {State = WaitForSelectorState.Attached});
     }
 
     // Hold every listener open until all the ports are picked: releasing one before asking for the next
@@ -426,7 +426,7 @@ public class SnapshotTests
         {
             foreach (var listener in listeners)
             {
-                listener?.Stop();
+                listener.Stop();
             }
         }
 

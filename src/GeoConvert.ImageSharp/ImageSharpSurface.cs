@@ -45,6 +45,10 @@ sealed class ImageSharpSurface(int width, int height, Rgba background) :
     // doesn't change between renders.
     static FontFamily? cachedFamily;
 
+    // Plain sans-serif families, in preference order — spanning the usual Windows, macOS and
+    // Linux-distro installs.
+    static readonly string[] preferredFamilies = ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Segoe UI", "Verdana", "Tahoma"];
+
     readonly Image<Rgba32> image = new(width, height, ToPixel(background));
 
     public int Width { get; } = width;
@@ -149,23 +153,26 @@ sealed class ImageSharpSurface(int width, int height, Rgba background) :
 
     static Font ResolveFont(float emSize)
     {
-        cachedFamily ??= PickFamily();
+        cachedFamily ??= PickFamily(SystemFonts.Collection, preferredFamilies);
         return cachedFamily.Value.CreateFont(emSize, FontStyle.Regular);
     }
 
-    static FontFamily PickFamily()
+    /// <summary>Picks the label face: the first of <paramref name="preferred"/> that
+    /// <paramref name="collection"/> holds, else whatever it offers first. Takes the collection rather
+    /// than reading <see cref="SystemFonts"/> directly so the fallback rungs are testable on a machine
+    /// that does have fonts installed.</summary>
+    internal static FontFamily PickFamily(IReadOnlyFontCollection collection, IReadOnlyList<string> preferred)
     {
         // Prefer a plain sans-serif when one is installed; otherwise take whatever the system offers.
-        string[] preferred = ["Arial", "Helvetica", "Liberation Sans", "DejaVu Sans", "Segoe UI", "Verdana", "Tahoma"];
         foreach (var name in preferred)
         {
-            if (SystemFonts.TryGet(name, out var family))
+            if (collection.TryGet(name, out var family))
             {
                 return family;
             }
         }
 
-        foreach (var family in SystemFonts.Families)
+        foreach (var family in collection.Families)
         {
             return family;
         }

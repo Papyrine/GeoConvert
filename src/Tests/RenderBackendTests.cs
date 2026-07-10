@@ -1,5 +1,6 @@
 using GeoConvert.ImageSharp;
 using GeoConvert.Skia;
+using SixLabors.Fonts;
 using SixLabors.ImageSharp.PixelFormats;
 using SixImage = SixLabors.ImageSharp.Image;
 
@@ -11,6 +12,8 @@ public class RenderBackendTests
 {
     static readonly Func<FeatureCollection, RenderOptions, byte[]> skia = SkiaRenderer.RenderPng;
     static readonly Func<FeatureCollection, RenderOptions, byte[]> imageSharp = ImageSharpRenderer.RenderPng;
+
+    static readonly (double X, double Y)[] square = [(8, 8), (56, 8), (56, 56), (8, 56)];
 
     [Test]
     public async Task PaintSurface_runs_the_shared_pipeline()
@@ -261,8 +264,159 @@ public class RenderBackendTests
         await Assert.That(nonBackground).IsGreaterThan(0);
     }
 
+    [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task Stream_overload_writes_a_png(string backend)
+    {
+        using var stream = new MemoryStream();
+
+        if (backend == "skia")
+        {
+            SkiaRenderer.RenderPng(Sample.Polygons(), stream, new() { Width = 96, Height = 96 });
+        }
+        else
+        {
+            ImageSharpRenderer.RenderPng(Sample.Polygons(), stream, new() { Width = 96, Height = 96 });
+        }
+
+        // A writer never closes a caller-provided stream — the same contract the format codecs keep.
+        await Assert.That(stream.CanWrite).IsTrue();
+
+        var (width, height, _) = Inspect(stream.ToArray());
+        await Assert.That(width).IsEqualTo(96);
+        await Assert.That(height).IsEqualTo(96);
+    }
+
+    [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task Labels_paint_a_knockout_backdrop_without_a_halo(string backend)
+    {
+        // LabelKnockout drives IRenderSurface.FillRect (the backdrop rect under the text) and a null
+        // LabelHalo skips the outline pass. Neither is reached by the halo-on, knockout-off defaults
+        // the other label tests use.
+        var features = new FeatureCollection
+        {
+            new Feature(new Polygon([[new(0, 0), new(10, 0), new(10, 10), new(0, 10), new(0, 0)]])),
+        };
+
+        var png = Render(backend, features, new()
+        {
+            Width = 256,
+            Height = 256,
+            LabelHalo = null,
+            LabelKnockout = new Rgba(255, 0, 0),
+            Label = _ => "Region",
+        });
+
+        // The knockout rect is the only pure-red thing in the scene, so red pixels prove it painted.
+        await Assert.That(CountPixels(png, new(255, 0, 0, 255))).IsGreaterThan(0);
+    }
+
+    [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task Transparent_fill_paints_nothing(string backend)
+    {
+        var png = PaintDirect(backend, _ => _.FillPolygon([square], Rgba.Transparent));
+
+        await Assert.That(Inspect(png).NonBackground).IsEqualTo(0);
+    }
+
+    [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task Empty_rings_are_skipped(string backend)
+    {
+        // An empty ring contributes no sub-path; the rest of the polygon still fills.
+        var png = PaintDirect(backend, _ => _.FillPolygon([[], square], Rgba.Black));
+
+        await Assert.That(Inspect(png).NonBackground).IsGreaterThan(0);
+    }
+
+    [Test]
+    [Arguments("skia")]
+    [Arguments("imagesharp")]
+    public async Task A_chain_under_two_points_strokes_nothing(string backend)
+    {
+        var single = PaintDirect(backend, _ => _.StrokePath([(32d, 32d)], 4, Rgba.Black));
+        var empty = PaintDirect(backend, _ => _.StrokePath([], 4, Rgba.Black));
+
+        await Assert.That(Inspect(single).NonBackground).IsEqualTo(0);
+        await Assert.That(Inspect(empty).NonBackground).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ImageSharp_maps_the_png_compression_level()
+    {
+        // Level0 stores the IDAT uncompressed and Level9 squeezes hardest, so the encoded sizes order
+        // themselves — which is what shows RenderOptions.Png.Compression reaches ImageSharp's encoder
+        // rather than being dropped. (Skia picks its own deflate settings and ignores it, by design.)
+        var none = EncodeAt(CompressionLevel.NoCompression);
+        var fastest = EncodeAt(CompressionLevel.Fastest);
+        var smallest = EncodeAt(CompressionLevel.SmallestSize);
+        var optimal = EncodeAt(CompressionLevel.Optimal);
+
+        await Assert.That(none.Length).IsGreaterThan(optimal.Length);
+        await Assert.That(smallest.Length).IsLessThanOrEqualTo(fastest.Length);
+        await Assert.That(Inspect(optimal).Width).IsEqualTo(200);
+
+        static byte[] EncodeAt(CompressionLevel compression) =>
+            ImageSharpRenderer.RenderPng(
+                Sample.Polygons(),
+                new()
+                {
+                    Width = 200,
+                    Height = 150,
+                    Png = new()
+                    {
+                        Compression = compression,
+                    },
+                });
+    }
+
+    [Test]
+    public async Task ImageSharp_falls_back_to_any_installed_font()
+    {
+        // No preferred name matches, so the picker drops to the first family the collection offers.
+        var family = ImageSharpSurface.PickFamily(SystemFonts.Collection, ["No Such Font Family"]);
+
+        await Assert.That(SystemFonts.Families.Contains(family)).IsTrue();
+    }
+
+    [Test]
+    public async Task ImageSharp_throws_when_no_font_is_installed()
+    {
+        // An empty collection exhausts both rungs of the ladder — labels can't be drawn at all.
+        var threw = TestSupport.ThrowsGeo(() => ImageSharpSurface.PickFamily(new FontCollection(), []));
+
+        await Assert.That(threw).IsTrue();
+    }
+
     static byte[] Render(string backend, FeatureCollection features, RenderOptions options) =>
         (backend == "skia" ? skia : imageSharp)(features, options);
+
+    // Paints straight into a backend surface. The renderer pipeline never emits a transparent fill, an
+    // empty ring or a one-point chain, so the guards for them are only reachable at this level.
+    static byte[] PaintDirect(string backend, Action<IRenderSurface> paint)
+    {
+        using var stream = new MemoryStream();
+        if (backend == "skia")
+        {
+            using var surface = new SkiaSurface(64, 64, Rgba.White);
+            paint(surface);
+            surface.Encode(stream, CompressionLevel.Optimal);
+        }
+        else
+        {
+            using var surface = new ImageSharpSurface(64, 64, Rgba.White);
+            paint(surface);
+            surface.Encode(stream, CompressionLevel.Optimal);
+        }
+
+        return stream.ToArray();
+    }
 
     static Dictionary<string, object?> Named(string name) =>
         new()
@@ -288,6 +442,26 @@ public class RenderBackendTests
         }
 
         return (image.Width, image.Height, nonBackground);
+    }
+
+    // Counts pixels matching an exact colour — used to prove a specific primitive painted, rather
+    // than just that something did.
+    static int CountPixels(byte[] png, Rgba32 match)
+    {
+        using var image = SixImage.Load<Rgba32>(png);
+        var count = 0;
+        for (var y = 0; y < image.Height; y++)
+        {
+            for (var x = 0; x < image.Width; x++)
+            {
+                if (image[x, y] == match)
+                {
+                    count++;
+                }
+            }
+        }
+
+        return count;
     }
 
     // A counting IRenderSurface used to prove the PaintSurface seam drives the shared geometry pass

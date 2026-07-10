@@ -34,8 +34,17 @@ Run from the repo root.
 - Coverage: run the test exe with `--coverage --coverage-output-format cobertura --coverage-output
   unit.cobertura.xml --results-directory TestResults`, then gate with
   `pwsh src/coverage-check.ps1 -Report TestResults/unit.cobertura.xml`. The shipped source is kept at
-  **100% line coverage** (the gate, and CI, fail below that). `coverage-check.ps1` scopes to files under
-  `src/` excluding the test project (Microsoft coverage instruments everything otherwise).
+  **100% line coverage** (the gate, and CI, fail below that). `coverage-check.ps1` scopes to the four
+  shipped projects — `GeoConvert`, `GeoConvert.Cli`, `GeoConvert.Skia`, `GeoConvert.ImageSharp` — and
+  ignores everything else under `src/` (the test project, the sample web app, the WinForms app), which
+  the profiler would otherwise instrument too. The gate is on **lines only**; branch coverage sits in the
+  90s and is not enforced. CI runs Coverlet rather than the Microsoft profiler (which instruments nothing
+  on the AppVeyor image) — see `src/appveyor.yml` for the exact invocation. Reproduce it locally with
+  `coverlet src/Tests/bin/Debug/net10.0 --target dotnet --targetargs "src/Tests/bin/Debug/net10.0/Tests.dll
+  --results-directory TestResults" --format cobertura --output TestResults/unit.cobertura.xml --include
+  "[GeoConvert*]*" --exclude-assemblies-without-sources None`. The `--include` filter is what keeps the
+  report — and the module table Coverlet prints — to the shipped assemblies instead of burying them under
+  TUnit/Verify/Microsoft.Testing rows.
 - Benchmarks (BenchmarkDotNet, requires Release):
   `dotnet run -c Release --project src/Benchmarks -- --filter '*'` (add `--job Dry` for a fast smoke
   run). `ConvertBenchmarks` measures read/write per stream format; `RenderBenchmarks` measures PNG
@@ -208,6 +217,10 @@ the root has features); single-file `.shp` mode is unchanged.
   FlatBuffers builder are unit-testable and adversarial inputs can be crafted). Because Polyfill is a
   source package compiled into each assembly, the Tests project must **not** reference Polyfill itself —
   it consumes GeoConvert's copy through IVT; a second copy causes ambiguous-extension build errors.
+  `GeoConvert.Skia` and `GeoConvert.ImageSharp` do the same, so the tests can drive their internal
+  `SkiaSurface` / `ImageSharpSurface` directly: the surfaces' primitive guards (fully transparent fill,
+  empty ring, sub-two-point chain) are unreachable through the renderer pipeline, which never emits any
+  of them. All three sign with `src/key.snk`, so every IVT entry carries the same public key.
 - Tests use TUnit + Verify.TUnit + Verify.DiffPlex. `RoundTripTests` write→read→`Verify` the resulting
   GeoJSON (so the snapshot shows what each format preserves); `SerializeTests` snapshot raw output;
   shared fixtures are in `src/Tests/Sample.cs`.

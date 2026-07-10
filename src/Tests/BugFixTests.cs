@@ -524,4 +524,183 @@ public class BugFixTests
 
         return data;
     }
+
+    // #14 — The recursive-descent readers (WKT, WKB, KML) had no recursion cap, so a nested input a
+    // few hundred kilobytes long recursed until the stack overflowed. StackOverflowException cannot
+    // be caught in .NET, so this terminated the process rather than surfacing GeoConvertException.
+    // GeoJson/TopoJson are incidentally protected by JsonDocument's own 64-level default.
+    [Test]
+    public async Task Wkt_deep_nesting_throws_instead_of_overflowing_the_stack()
+    {
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkt.ParseGeometry(NestedWkt(Nesting.MaxDepth)))).IsTrue();
+        // The depth that used to kill the process.
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkt.ParseGeometry(NestedWkt(50_000)))).IsTrue();
+    }
+
+    [Test]
+    public async Task Wkt_nesting_up_to_the_cap_still_parses()
+    {
+        // MaxDepth - 1 collections wrapping a point puts the point exactly at the cap.
+        var geometry = Wkt.ParseGeometry(NestedWkt(Nesting.MaxDepth - 1));
+        await Assert.That(geometry).IsTypeOf<GeometryCollection>();
+    }
+
+    // A WKT cell inside a CSV reaches the same parser, so the cap has to protect that entry point too.
+    [Test]
+    public async Task Csv_deep_nested_wkt_cell_throws_instead_of_overflowing_the_stack()
+    {
+        var csv = $"wkt,name\n\"{NestedWkt(50_000)}\",deep\n";
+        await Assert.That(TestSupport.ThrowsGeo(() => Csv.ReadString(csv))).IsTrue();
+    }
+
+    [Test]
+    public async Task Wkb_deep_nesting_throws_instead_of_overflowing_the_stack()
+    {
+        var atCap = NestedWkb(Nesting.MaxDepth);
+        var absurd = NestedWkb(50_000);
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(atCap))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkb.ParseGeometry(absurd))).IsTrue();
+    }
+
+    [Test]
+    public async Task Wkb_nesting_up_to_the_cap_still_parses()
+    {
+        var geometry = Wkb.ParseGeometry(NestedWkb(Nesting.MaxDepth - 1));
+        await Assert.That(geometry).IsTypeOf<GeometryCollection>();
+    }
+
+    // FlatGeobuf reads a part's table via a *signed* offset, so a crafted part can point back at its
+    // own parent — an unbounded cycle rather than merely deep nesting. Deep-but-acyclic input (which
+    // the writer can produce) exercises the same guard.
+    [Test]
+    public async Task FlatGeobuf_deep_nesting_throws_instead_of_overflowing_the_stack()
+    {
+        var bytes = WriteFlatGeobuf(NestedCollection(Nesting.MaxDepth));
+        await Assert.That(TestSupport.ThrowsGeo(() => ReadFlatGeobuf(bytes))).IsTrue();
+    }
+
+    [Test]
+    public async Task FlatGeobuf_nesting_up_to_the_cap_still_reads()
+    {
+        var bytes = WriteFlatGeobuf(NestedCollection(Nesting.MaxDepth - 1));
+        await Assert.That(ReadFlatGeobuf(bytes).Features[0].Geometry).IsTypeOf<GeometryCollection>();
+    }
+
+    [Test]
+    public async Task Kml_deep_multi_geometry_throws_instead_of_overflowing_the_stack()
+    {
+        await Assert.That(TestSupport.ThrowsGeo(() => ReadKml(NestedMultiGeometry(Nesting.MaxDepth)))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => ReadKml(NestedMultiGeometry(50_000)))).IsTrue();
+    }
+
+    [Test]
+    public async Task Kml_multi_geometry_up_to_the_cap_still_reads()
+    {
+        var collection = ReadKml(NestedMultiGeometry(Nesting.MaxDepth - 1));
+        await Assert.That(collection.Features[0].Geometry).IsNotNull();
+    }
+
+    // <Folder>/<Document> nesting recurses through ScanContainer, so it needs the same cap.
+    [Test]
+    public async Task Kml_deep_folder_nesting_throws_instead_of_overflowing_the_stack()
+    {
+        await Assert.That(TestSupport.ThrowsGeo(() => ReadKml(NestedFolders(200)))).IsTrue();
+        await Assert.That(TestSupport.ThrowsGeo(() => ReadKml(NestedFolders(50_000)))).IsTrue();
+    }
+
+    [Test]
+    public async Task Kml_modest_folder_nesting_still_reads()
+    {
+        var collection = ReadKml(NestedFolders(32));
+        await Assert.That(collection.Children[0].Children.Count).IsEqualTo(1);
+    }
+
+    static FeatureCollection ReadKml(string kml)
+    {
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(kml));
+        return Kml.Read(stream);
+    }
+
+    static byte[] WriteFlatGeobuf(Geometry geometry)
+    {
+        using var stream = new MemoryStream();
+        FlatGeobuf.Write(stream, [new Feature(geometry)]);
+        return stream.ToArray();
+    }
+
+    static FeatureCollection ReadFlatGeobuf(byte[] bytes)
+    {
+        using var stream = new MemoryStream(bytes);
+        return FlatGeobuf.Read(stream);
+    }
+
+    // `levels` GeometryCollections wrapping a Point, so the point sits at depth levels + 1.
+    static Geometry NestedCollection(int levels)
+    {
+        Geometry geometry = new Point(1, 2);
+        for (var i = 0; i < levels; i++)
+        {
+            geometry = new GeometryCollection([geometry]);
+        }
+
+        return geometry;
+    }
+
+    // `levels` GEOMETRYCOLLECTIONs wrapping a POINT, so the point sits at depth levels + 1.
+    static string NestedWkt(int levels)
+    {
+        var builder = new StringBuilder();
+        for (var i = 0; i < levels; i++)
+        {
+            builder.Append("GEOMETRYCOLLECTION (");
+        }
+
+        builder.Append("POINT (1 2)");
+        builder.Append(')', levels);
+        return builder.ToString();
+    }
+
+    // `levels` single-child GeometryCollections (9 bytes each) wrapping a 2D Point (21 bytes).
+    static byte[] NestedWkb(int levels)
+    {
+        var bytes = new byte[levels * 9 + 21];
+        var span = bytes.AsSpan();
+        for (var i = 0; i < levels; i++)
+        {
+            var start = i * 9;
+            span[start] = 1; // little-endian
+            BinaryPrimitives.WriteUInt32LittleEndian(span[(start + 1)..], 7); // GeometryCollection
+            BinaryPrimitives.WriteUInt32LittleEndian(span[(start + 5)..], 1); // one child
+        }
+
+        var point = span[(levels * 9)..];
+        point[0] = 1;
+        BinaryPrimitives.WriteUInt32LittleEndian(point[1..], 1); // Point
+        BinaryPrimitives.WriteDoubleLittleEndian(point[5..], 1);
+        BinaryPrimitives.WriteDoubleLittleEndian(point[13..], 2);
+        return bytes;
+    }
+
+    static string NestedMultiGeometry(int levels) =>
+        KmlDocument(
+            $"""
+             <Placemark>
+             {Repeat("<MultiGeometry>", levels)}
+             <Point><coordinates>1,2</coordinates></Point>
+             {Repeat("</MultiGeometry>", levels)}
+             </Placemark>
+             """);
+
+    static string NestedFolders(int levels) =>
+        KmlDocument(Repeat("<Folder>", levels) + Repeat("</Folder>", levels));
+
+    static string KmlDocument(string documentBody) =>
+        $"""
+         <kml xmlns="http://www.opengis.net/kml/2.2"><Document>
+         {documentBody}
+         </Document></kml>
+         """;
+
+    static string Repeat(string text, int count) =>
+        new StringBuilder(text.Length * count).Insert(0, text, count).ToString();
 }

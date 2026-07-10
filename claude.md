@@ -118,6 +118,15 @@ Format codec conventions: a writer must **not** close a caller-provided `Stream`
 
 ### Known per-format limits (encoded in the codecs and tested)
 
+Every recursive-descent reader caps nesting at `Nesting.MaxDepth` (64, matching `JsonDocument`'s
+default — which is what already protects GeoJSON/TopoJSON for free) and throws `GeoConvertException`
+past it: WKT and the WKT cell of a CSV (`GEOMETRYCOLLECTION`), WKB (`GeometryCollection`), KML
+(`<MultiGeometry>`, and `<Folder>`/`<Document>` containers), FlatGeobuf (geometry `parts`). Without
+the cap a hostile input recursed until the stack overflowed, which kills the process and **cannot be
+caught**. FlatGeobuf is the sharpest case: `FlatBufferTable.GetTableElement` adds a *signed* offset,
+so a crafted part can point back at its own parent and cycle forever rather than merely nest deeply.
+Thread the depth counter through any new recursive reader.
+
 Shapefile holds one geometry category per file (mixed throws) and is 2D. FlatGeobuf is written without
 the spatial index (`index_node_size=0`) and is 2D; indexed files are read by skipping the index. GPX
 has no area type, so a polygon is written as a track (one segment per ring), a multi polygon flattens

@@ -124,8 +124,8 @@ static class SampleData
     /// <paramref name="latStep"/>° of latitude, each sampled at <paramref name="verticesPerLine"/>
     /// points. Every line crosses all of Goode's lon interrupt meridians (and lines near the
     /// equator straddle the hemisphere split), so rendering under <see cref="MapProjection.Goode"/>
-    /// drives the polyline boundary-split path (SubdividePath → InterpolateToBoundary) hard — the
-    /// per-crossing code whose allocation profile the MemoryDiagnoser column exposes directly.
+    /// drives the polyline boundary-split path (SubdividePath) hard — the per-crossing code whose
+    /// allocation profile the MemoryDiagnoser column exposes directly.
     /// </summary>
     public static FeatureCollection WorldLines(double latStep, int verticesPerLine)
     {

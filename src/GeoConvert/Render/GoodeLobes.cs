@@ -269,9 +269,33 @@ static class GoodeLobes
         return (output, outputTags);
     }
 
+    // Every distinct lon/lat plane that bounds a lobe sub-rect. A straight lon/lat segment can only
+    // change lobe by crossing one of these, so together they are the complete candidate set for a
+    // split. Derived from AllLobes so the two can't drift apart if the lobe table is retuned.
+    static readonly double[] boundaryLongitudes = DistinctSorted(AllLobes.SelectMany(_ => _.Rects).SelectMany(_ => new[] { _.LonMin, _.LonMax }));
+    static readonly double[] boundaryLatitudes = DistinctSorted(AllLobes.SelectMany(_ => _.Rects).SelectMany(_ => new[] { _.LatMin, _.LatMax }));
+
+    static double[] DistinctSorted(IEnumerable<double> values) => [.. values.Distinct().Order()];
+
+    // A run this short is treated as empty: two boundary planes were crossed at the same point (the
+    // segment passed exactly through a lobe corner), so the run has no interior to sample a lobe
+    // from — its midpoint would be the ambiguous corner itself.
+    const double minimumRunLength = 1e-12;
+
+    // One boundary plane crossing, in segment parameter space. Axis+Plane are carried alongside T so
+    // the split vertex can be snapped exactly onto the plane rather than reconstructed from T (both
+    // lobes project that vertex, and it has to land on their shared edge in each).
+    readonly record struct Crossing(double T, Axis Axis, double Plane);
+
     /// <summary>Splits a polyline at every lobe boundary it crosses. Each emitted subpath is a
     /// contiguous run of vertices in one lobe (the boundary intersection is inserted at both
-    /// ends of the split so the strokes reach all the way to the lobe edge before the gap).</summary>
+    /// ends of the split so the strokes reach all the way to the lobe edge before the gap).
+    /// <para>A single segment can cross any number of boundaries, on either axis: the north
+    /// lobes are divided by a meridian below lat 60° and a different one above it (the Greenland
+    /// cut-out), so a due-north line changes lobe across a *parallel*; and a long segment can
+    /// step over an entire lobe, or — because the north lobes are L-shaped — leave one lobe and
+    /// re-enter it. So each segment is walked plane by plane instead of being judged by the
+    /// lobes of its two endpoints.</para></summary>
     public static IEnumerable<(Lobe Lobe, List<Position> Positions)> SubdividePath(IReadOnlyList<Position> positions)
     {
         if (positions.Count < 2)
@@ -279,33 +303,130 @@ static class GoodeLobes
             yield break;
         }
 
+        // A straight segment crosses each plane at most once, so this is sized for the worst case
+        // and reused across the path's segments. Allocated rather than stack-allocated because an
+        // iterator body can't stackalloc, and reused per-path rather than kept in a [ThreadStatic]
+        // because two SubdividePath enumerations can be alive on one thread.
+        var crossings = new Crossing[boundaryLongitudes.Length + boundaryLatitudes.Length];
         var currentLobe = FindLobe(positions[0].X, positions[0].Y);
         var current = new List<Position> { positions[0] };
         for (var i = 1; i < positions.Count; i++)
         {
             var previous = positions[i - 1];
             var next = positions[i];
-            var nextLobe = FindLobe(next.X, next.Y);
-            if (nextLobe.Equals(currentLobe))
+            var crossingCount = CollectCrossings(previous, next, crossings);
+
+            // Walk the runs between consecutive crossings. A run's lobe is read from its midpoint,
+            // because the crossing points themselves sit exactly on a boundary where FindLobe is
+            // ambiguous. Most crossings don't actually change lobe — lon=-40° bounds the north
+            // lobes but runs through the middle of the southern S-America lobe — so only a run
+            // whose lobe differs from the one we're in produces a split.
+            var runStart = 0d;
+            for (var run = 0; run <= crossingCount; run++)
             {
-                current.Add(next);
-                continue;
+                var runEnd = run == crossingCount ? 1 : crossings[run].T;
+                if (runEnd - runStart < minimumRunLength)
+                {
+                    runStart = runEnd;
+                    continue;
+                }
+
+                var midpoint = Lerp(previous, next, (runStart + runEnd) / 2);
+                var lobe = FindLobe(midpoint.X, midpoint.Y);
+                if (!lobe.Equals(currentLobe))
+                {
+                    if (runStart == 0)
+                    {
+                        // `previous` is itself the boundary point, and is already the last vertex
+                        // of the current subpath. When it's also the *only* one — the path begins
+                        // on a boundary, and FindLobe resolved the tie to the lobe it's heading
+                        // out of — there's no stroke to emit, just a lobe to correct.
+                        if (current.Count > 1)
+                        {
+                            yield return (currentLobe, current);
+                            current = [previous];
+                        }
+                    }
+                    else
+                    {
+                        var crossing = crossings[run - 1];
+                        var split = Intersect(previous, next, crossing.Axis, crossing.Plane);
+                        current.Add(split);
+                        yield return (currentLobe, current);
+                        current = [split];
+                    }
+
+                    currentLobe = lobe;
+                }
+
+                runStart = runEnd;
             }
 
-            // Crossed a boundary. Insert the boundary point at the end of the current subpath
-            // and at the start of the next, so each subpath's stroke runs all the way to its
-            // lobe edge. We pick one boundary even if both hemisphere and lon change in the
-            // same segment — long segments crossing multiple boundaries are rare in real
-            // geodata, and the visual approximation is invisible at typical densities.
-            var split = InterpolateToBoundary(previous, next, currentLobe, nextLobe);
-            current.Add(split);
-            yield return (currentLobe, current);
-            current = [split, next];
-            currentLobe = nextLobe;
+            current.Add(next);
         }
 
         yield return (currentLobe, current);
     }
+
+    // Fills <paramref name="crossings"/> with the parameters at which the segment strictly crosses a
+    // lobe boundary plane, ascending, and returns how many there were.
+    static int CollectCrossings(Position a, Position b, Crossing[] crossings)
+    {
+        var count = 0;
+        foreach (var longitude in boundaryLongitudes)
+        {
+            if (TryCrossing(a.X, b.X, longitude, out var t))
+            {
+                crossings[count] = new(t, Axis.Longitude, longitude);
+                count++;
+            }
+        }
+
+        foreach (var latitude in boundaryLatitudes)
+        {
+            if (TryCrossing(a.Y, b.Y, latitude, out var t))
+            {
+                crossings[count] = new(t, Axis.Latitude, latitude);
+                count++;
+            }
+        }
+
+        // Insertion sort. The two groups arrive individually ordered only for an eastward/northward
+        // segment, and there are at most a handful of crossings, so anything fancier is overhead.
+        for (var i = 1; i < count; i++)
+        {
+            var value = crossings[i];
+            var j = i - 1;
+            while (j >= 0 && crossings[j].T > value.T)
+            {
+                crossings[j + 1] = crossings[j];
+                j--;
+            }
+
+            crossings[j + 1] = value;
+        }
+
+        return count;
+    }
+
+    // The parameter at which the segment crosses <paramref name="plane"/>, or false when it stays on
+    // one side. A segment that merely touches the plane with an endpoint doesn't cross it: the
+    // parameter would be 0 or 1, which bounds a run rather than splitting one.
+    static bool TryCrossing(double from, double to, double plane, out double t)
+    {
+        if (!(from < plane && to > plane) &&
+            !(from > plane && to < plane))
+        {
+            t = 0;
+            return false;
+        }
+
+        t = (plane - from) / (to - from);
+        return true;
+    }
+
+    static Position Lerp(Position a, Position b, double t) =>
+        new(a.X + t * (b.X - a.X), a.Y + t * (b.Y - a.Y));
 
     // Which coordinate a half-plane bounds. Each lobe AABB is clipped by two longitude planes and
     // two latitude planes, so the plane is fully described by an axis + threshold + direction —
@@ -414,28 +535,6 @@ static class GoodeLobes
         {
             yield return chain.ToArray();
         }
-    }
-
-    static Position InterpolateToBoundary(Position a, Position b, Lobe lobeA, Lobe lobeB)
-    {
-        // Different hemispheres → split at the equator. Use the first rect of each lobe to
-        // identify hemisphere (every rect of one lobe is in the same hemisphere).
-        if (lobeA.Rects[0].LatMin >= 0 != lobeB.Rects[0].LatMin >= 0)
-        {
-            return InterpolateToY(a, b, 0);
-        }
-
-        // Same hemisphere: find a meridian shared between any rect of A and any rect of B that
-        // lies between a.X and b.X — that's the boundary the segment crosses. Throws via
-        // .First() if no match exists, which would indicate a malformed lobe layout; for our
-        // canonical lobes adjacent lobes always share a meridian.
-        var lo = Math.Min(a.X, b.X);
-        var hi = Math.Max(a.X, b.X);
-        var meridian = lobeA.Rects
-            .SelectMany(r => new[] { r.LonMin, r.LonMax })
-            .First(m => m >= lo && m <= hi &&
-                lobeB.Rects.Any(rb => rb.LonMin == m || rb.LonMax == m));
-        return InterpolateToX(a, b, meridian);
     }
 
     static Position InterpolateToX(Position a, Position b, double x)

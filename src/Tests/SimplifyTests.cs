@@ -393,6 +393,67 @@ public class SimplifyTests
     }
 
     [Test]
+    [Arguments(SimplifyMethod.DouglasPeucker)]
+    [Arguments(SimplifyMethod.Visvalingam)]
+    public async Task SimplifyTopology_shared_edge_triangles_never_collapse_below_a_triangle(SimplifyMethod method)
+    {
+        // The ordinary shared-border case. Each triangle splits into exactly two arcs between the
+        // same junction pair — (0,0) and (10,0) — and both arcs thin to their endpoints, so naive
+        // reassembly yields (0,0) (10,0) (0,0): three positions, zero area, an invalid linear ring.
+        // The degenerate-ring guard sends each ring through the closed-ring simplifier instead.
+        var collection = new FeatureCollection
+        {
+            new Feature(new Polygon([[new(0, 0), new(10, 0), new(5, 0.01), new(0, 0)]])),
+            new Feature(new Polygon([[new(0, 0), new(5, -0.01), new(10, 0), new(0, 0)]])),
+        };
+
+        var result = Simplifier.SimplifyTopology(collection, 1, method);
+
+        var north = ((Polygon) result.Features[0].Geometry!).Rings[0];
+        var south = ((Polygon) result.Features[1].Geometry!).Rings[0];
+
+        foreach (var ring in new[] { north, south })
+        {
+            await Assert.That(ring.Count).IsGreaterThanOrEqualTo(4);
+            await Assert.That(ring[0]).IsEqualTo(ring[^1]);
+            await Assert.That(ring.Take(ring.Count - 1).Distinct().Count()).IsGreaterThanOrEqualTo(3);
+        }
+
+        // Both fall back to their minimal valid form — which here is the original triangle — so the
+        // shared (0,0)-(10,0) edge still lines up vertex-for-vertex on both sides.
+        await Assert.That(north.Contains(new(0, 0))).IsTrue();
+        await Assert.That(north.Contains(new(10, 0))).IsTrue();
+        await Assert.That(south.Contains(new(0, 0))).IsTrue();
+        await Assert.That(south.Contains(new(10, 0))).IsTrue();
+    }
+
+    [Test]
+    public async Task SimplifyTopology_self_touching_ring_never_collapses_to_two_distinct_vertices()
+    {
+        // A ring that returns to (0,0) mid-traversal: a big lobe and a tiny sub-tolerance one. The
+        // repeated vertex is the only junction found at two indices, so the ring splits into two
+        // arcs. The big lobe keeps its (4,0) apex, the tiny one collapses to its endpoints, and
+        // reassembly gives (0,0) (4,0) (0,0) (0,0) — four positions but two distinct vertices, which
+        // the position-count check alone would wave through.
+        var collection = new FeatureCollection
+        {
+            new Feature(new Polygon(
+            [
+                [
+                    new(0, 0), new(4, 0), new(0, 1), new(0, 0), new(-0.1, 0), new(0, -0.05), new(0, 0),
+                ],
+            ])),
+        };
+
+        var result = Simplifier.SimplifyTopology(collection, 2);
+        var ring = ((Polygon) result.Features[0].Geometry!).Rings[0];
+
+        await Assert.That(ring.Count).IsGreaterThanOrEqualTo(4);
+        await Assert.That(ring[0]).IsEqualTo(ring[^1]);
+        await Assert.That(ring.Take(ring.Count - 1).Distinct().Count()).IsGreaterThanOrEqualTo(3);
+    }
+
+    [Test]
     public async Task SimplifyTopology_polygon_with_hole_thins_both_rings()
     {
         // Polygon with a hole: exterior + interior rings, no neighbours. Both go through the

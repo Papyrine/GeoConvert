@@ -125,6 +125,17 @@ static class LineSimplifier
                     maxDistance = distance;
                     farthest = i;
                 }
+                else if (farthest != -1 &&
+                         distance == maxDistance &&
+                         ComparePositions(points[i], points[farthest]) < 0)
+                {
+                    // Exact perpendicular-distance tie: break it on the vertex's own coordinates, not
+                    // its index. "Keep the earliest index" flips when the same arc is traversed the
+                    // other way, so two rings sharing a border would keep mirror vertices and
+                    // TopologySimplifier's bit-identical-shared-arc guarantee would crack a hairline
+                    // gap. ComparePositions is reversal-invariant, so both directions keep the same one.
+                    farthest = i;
+                }
             }
 
             if (farthest != -1 && maxDistance > toleranceSquared)
@@ -180,25 +191,29 @@ static class LineSimplifier
         // left to be skipped on pop (lazy deletion) — currentArea tracks each vertex's live area.
         var removed = new bool[count];
         var currentArea = new double[count];
-        var queue = new PriorityQueue<int, double>();
+        // Priority is (area, vertex): the vertex breaks exact area ties by coordinate so the removal
+        // order — and therefore the surviving set — is reversal-invariant. The BCL PriorityQueue's own
+        // tie order is unspecified and flips under reversal, which would break TopologySimplifier's
+        // bit-identical-shared-arc guarantee just as an index tie-break would (see ComparePositions).
+        var queue = new PriorityQueue<int, (double Area, Position Vertex)>(AreaThenPositionComparer.Instance);
         for (var i = 1; i < count - 1; i++)
         {
             var area = TriangleArea(points[previous[i]], points[i], points[next[i]]);
             currentArea[i] = area;
-            queue.Enqueue(i, area);
+            queue.Enqueue(i, (area, points[i]));
         }
 
         var alive = count;
-        while (alive > minPoints && queue.TryDequeue(out var index, out var area))
+        while (alive > minPoints && queue.TryDequeue(out var index, out var priority))
         {
-            if (removed[index] || area != currentArea[index])
+            if (removed[index] || priority.Area != currentArea[index])
             {
                 // Stale entry: the vertex was already removed, or re-queued under a newer area after a
                 // neighbour was dropped. The live entry (if any) is still in the heap behind this one.
                 continue;
             }
 
-            if (area >= minArea)
+            if (priority.Area >= minArea)
             {
                 // The global minimum is at/above the threshold, so every surviving vertex is too.
                 break;
@@ -226,7 +241,7 @@ static class LineSimplifier
         return result;
     }
 
-    static void Rearea(IReadOnlyList<Position> points, int[] previous, int[] next, double[] currentArea, PriorityQueue<int, double> queue, int index)
+    static void Rearea(IReadOnlyList<Position> points, int[] previous, int[] next, double[] currentArea, PriorityQueue<int, (double Area, Position Vertex)> queue, int index)
     {
         if (index <= 0 || index >= points.Count - 1)
         {
@@ -236,9 +251,51 @@ static class LineSimplifier
 
         var area = TriangleArea(points[previous[index]], points[index], points[next[index]]);
         currentArea[index] = area;
-        queue.Enqueue(index, area);
+        queue.Enqueue(index, (area, points[index]));
     }
 
     static double TriangleArea(Position a, Position b, Position c) =>
         Math.Abs((b.X - a.X) * (c.Y - a.Y) - (c.X - a.X) * (b.Y - a.Y)) / 2;
+
+    // A total order on vertices that ignores which direction an arc is walked — the reversal-invariant
+    // tie-breaker both simplifiers use so a border shared by two rings thins to the *same* vertices from
+    // either side (TopologySimplifier's whole reason to exist). Comparing coordinates does that; comparing
+    // indices does not, because the shared arc runs forward in one ring and backward in the other. Missing
+    // Z/M sort as -Inf so a 2D vertex never ties with an otherwise-equal 3D one.
+    static int ComparePositions(Position a, Position b)
+    {
+        var byX = a.X.CompareTo(b.X);
+        if (byX != 0)
+        {
+            return byX;
+        }
+
+        var byY = a.Y.CompareTo(b.Y);
+        if (byY != 0)
+        {
+            return byY;
+        }
+
+        var byZ = (a.Z ?? double.NegativeInfinity).CompareTo(b.Z ?? double.NegativeInfinity);
+        if (byZ != 0)
+        {
+            return byZ;
+        }
+
+        return (a.M ?? double.NegativeInfinity).CompareTo(b.M ?? double.NegativeInfinity);
+    }
+
+    // Orders the Visvalingam heap by effective area, then by vertex to break exact ties deterministically
+    // and reversal-invariantly. Two distinct vertices can share an area; a vertex re-queued under a new
+    // area compares by that area against its live value, so lazy-deletion still works.
+    sealed class AreaThenPositionComparer : IComparer<(double Area, Position Vertex)>
+    {
+        public static readonly AreaThenPositionComparer Instance = new();
+
+        public int Compare((double Area, Position Vertex) x, (double Area, Position Vertex) y)
+        {
+            var byArea = x.Area.CompareTo(y.Area);
+            return byArea != 0 ? byArea : ComparePositions(x.Vertex, y.Vertex);
+        }
+    }
 }

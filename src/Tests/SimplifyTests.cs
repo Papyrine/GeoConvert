@@ -5,6 +5,9 @@ public class SimplifyTests
     static IReadOnlyList<Position> Line(Geometry geometry) =>
         ((LineString) geometry).Positions;
 
+    static IReadOnlyList<Position> Reversed(IReadOnlyList<Position> positions) =>
+        [.. positions.Reverse()];
+
     [Test]
     public async Task DouglasPeucker_drops_collinear_vertices()
     {
@@ -66,6 +69,77 @@ public class SimplifyTests
         var line = new LineString([new(0, 0), new(1, 0), new(2, 0), new(3, 0)]);
         var result = Line(Simplifier.Simplify(line, 1, SimplifyMethod.Visvalingam));
         await Assert.That(result.Count).IsEqualTo(2);
+    }
+
+    // Two interior vertices sit at the SAME perpendicular distance from the chord — a bit-exact tie.
+    // DP's old "keep the earliest index" tie-break isn't reversal-symmetric: walking a shared arc
+    // backwards kept the mirror vertex, so two rings sharing a border thinned to different vertex
+    // sequences and TopologySimplifier's seamless-join guarantee cracked a hairline gap. Breaking the
+    // tie on the vertex's own coordinates is reversal-invariant — the same physical vertex survives
+    // whichever end we start from.
+    [Test]
+    public async Task DouglasPeucker_tie_break_is_reversal_invariant()
+    {
+        // (1,1) and (3,1) are both distance 1 from the (0,0)-(4,0) chord. At tolerance 0.7 only one
+        // survives the recursion; the coordinate tie-break keeps (1,1) from either direction.
+        IReadOnlyList<Position> forward = [new(0, 0), new(1, 1), new(3, 1), new(4, 0)];
+
+        var fromForward = Line(Simplifier.Simplify(new LineString(forward), 0.7));
+        var fromBackward = Line(Simplifier.Simplify(new LineString(Reversed(forward)), 0.7));
+
+        // Reversing the input just reverses the output — the surviving vertices are identical.
+        await Assert.That(fromForward.SequenceEqual(Reversed(fromBackward))).IsTrue();
+        // Concretely: (1,1) is kept and its mirror (3,1) dropped, both directions.
+        await Assert.That(fromForward.Contains(new(1, 1))).IsTrue();
+        await Assert.That(fromForward.Contains(new(3, 1))).IsFalse();
+        await Assert.That(fromBackward.Contains(new(1, 1))).IsTrue();
+        await Assert.That(fromBackward.Contains(new(3, 1))).IsFalse();
+    }
+
+    // Walks the coordinate tie-break's full ladder — X, then Y, then Z, then M — confirming each rung
+    // stays reversal-invariant. Each arc has two interior vertices tied on perpendicular distance that
+    // differ only at one ordinate, so the comparison has to fall through to that rung to pick a winner.
+    [Test]
+    public async Task DouglasPeucker_tie_break_ladder_is_reversal_invariant()
+    {
+        // Y breaks it: same X, mirrored Y — both distance 1 from the chord.
+        await AssertReversalInvariant([new(0, 0), new(2, 1), new(2, -1), new(4, 0)]);
+        // Z breaks it: coincident X/Y (identical planar distance), different Z.
+        await AssertReversalInvariant([new(0, 0), new(1, 1, 0), new(1, 1, 5), new(4, 0)]);
+        // M breaks it: coincident X/Y/Z, different M.
+        await AssertReversalInvariant([new(0, 0), new(1, 1, 0, 0), new(1, 1, 0, 5), new(4, 0)]);
+    }
+
+    static async Task AssertReversalInvariant(IReadOnlyList<Position> forward)
+    {
+        var fromForward = Line(Simplifier.Simplify(new LineString(forward), 0.7));
+        var fromBackward = Line(Simplifier.Simplify(new LineString(Reversed(forward)), 0.7));
+        await Assert.That(fromForward.SequenceEqual(Reversed(fromBackward))).IsTrue();
+    }
+
+    // Visvalingam had the same exposure through the priority queue's unspecified tie order. The heap
+    // now breaks exact area ties by vertex coordinate, so the removal order — and the surviving set —
+    // no longer depends on which end the arc is walked from.
+    [Test]
+    public async Task Visvalingam_tie_break_is_reversal_invariant()
+    {
+        // A flat "table top": the two interior vertices (1,2) and (2,2) both have effective area 1, an
+        // exact tie. They're adjacent, so removing one lifts the other's area to 3 — at threshold 2
+        // exactly one goes, and *which* one is decided entirely by the tie-break. An unstable heap
+        // order drops (1,2) walking forward but (2,2) walking backward, so the surviving vertex would
+        // flip with direction. The coordinate tie-break always removes (1,2), keeping (2,2) either way.
+        IReadOnlyList<Position> forward = [new(0, 0), new(1, 2), new(2, 2), new(3, 0)];
+
+        var fromForward = Line(Simplifier.Simplify(new LineString(forward), 2, SimplifyMethod.Visvalingam));
+        var fromBackward = Line(Simplifier.Simplify(new LineString(Reversed(forward)), 2, SimplifyMethod.Visvalingam));
+
+        // Reversing the input just reverses the output.
+        await Assert.That(fromForward.SequenceEqual(Reversed(fromBackward))).IsTrue();
+        // Concretely: (2,2) survives and (1,2) is dropped, regardless of direction.
+        await Assert.That(fromForward.Contains(new(2, 2))).IsTrue();
+        await Assert.That(fromForward.Contains(new(1, 2))).IsFalse();
+        await Assert.That(fromBackward.Contains(new(2, 2))).IsTrue();
+        await Assert.That(fromBackward.Contains(new(1, 2))).IsFalse();
     }
 
     [Test]

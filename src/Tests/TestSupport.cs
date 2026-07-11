@@ -94,6 +94,24 @@ static class TestSupport
             return true;
         }
     }
+
+    // The message of the GeoConvertException an action raises. The allocation-bounds tests assert on the
+    // message rather than the type, because the FlatGeobuf, WKB and GeoParquet readers wrap *every*
+    // exception — OutOfMemoryException included — as GeoConvertException. Those inputs therefore threw
+    // the documented type even before the bound existed, so only the message pins the guard that fired.
+    public static string GeoMessage(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (GeoConvertException exception)
+        {
+            return exception.Message;
+        }
+
+        throw new("Expected a GeoConvertException, but none was thrown.");
+    }
 }
 
 // A geometry whose Type is not a real enum value, used to drive defensive default branches.

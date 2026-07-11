@@ -25,17 +25,35 @@ static class Dbf
         var data = memory.GetBuffer();
 
         // header: 1 version + 3 date + 4 recordCount + 2 headerLen + 2 recordLen + 20 reserved = 32 bytes
-        var recordCount = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4));
+        if (length < 32)
+        {
+            throw new GeoConvertException($"DBF is {length} bytes; the header alone is 32.");
+        }
+
+        var declaredRecords = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4));
         var position = 32;
 
         var fields = new List<Field>();
         Span<byte> nameBytes = stackalloc byte[11];
-        while (position < length)
+        while (true)
         {
+            // `data` is the MemoryStream's backing array, which runs past the logical `length`, so an
+            // overrun reads stale bytes rather than throwing. Every read is checked against `length`.
+            if (position >= length)
+            {
+                throw new GeoConvertException("DBF field descriptors are missing their 0x0D terminator.");
+            }
+
             if (data[position] == 0x0D)
             {
                 position++;
                 break;
+            }
+
+            // 11 name + 1 type + 4 field data address + 1 length + 1 decimals + 14 reserved = 32 bytes
+            if (position + 32 > length)
+            {
+                throw new GeoConvertException("DBF field descriptor is truncated.");
             }
 
             data.AsSpan(position, 11).CopyTo(nameBytes);
@@ -62,7 +80,22 @@ static class Dbf
                 });
         }
 
-        var rows = new List<object?[]>((int)recordCount);
+        // What the reader actually consumes per record: the deletion flag plus the field widths. (The
+        // header carries its own record length at offset 10, but it is advisory and writers get it wrong.)
+        var recordLength = 1;
+        foreach (var field in fields)
+        {
+            recordLength += field.Length;
+        }
+
+        // The declared record count comes straight off the wire and presizes `rows`, so a 32-byte file
+        // claiming 0x40000000 records reserved 8 GiB before the first out-of-range read failed. Bound it
+        // by the records the file can actually hold — which also puts every per-cell slice below in
+        // bounds by construction. A trailing 0x1A end-of-file marker cannot complete a record, so it
+        // falls out of the division rather than being mistaken for one.
+        var recordCount = (int)Math.Min(declaredRecords, (uint)((length - position) / recordLength));
+
+        var rows = new List<object?[]>(recordCount);
         for (var r = 0; r < recordCount; r++)
         {
             var deletion = data[position];

@@ -1,36 +1,4 @@
 
-## 4. A 32-byte `.dbf` allocates 8 GiB
-
-`src/GeoConvert/Internal/Dbf.cs:28` and `:65`
-
-`recordCount` is read straight from the file and presizes the row list with no cross-check against
-the bytes actually present:
-
-```csharp
-var recordCount = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(4));  // :28
-...
-var rows = new List<object?[]>((int)recordCount);                           // :65
-```
-
-Measured, from a 32-byte input with no field terminator:
-
-```
-recordCount=0x40000000: IndexOutOfRangeException after allocating 8,192.0 MB
-recordCount=0xFFFFFFFF: ArgumentOutOfRangeException (negative capacity)
-```
-
-**Fix:** bound `recordCount` against `(length - headerLength) / recordLength` before presizing.
-Also bounds-check the per-cell `data.AsSpan(position, field.Length)` read at `:75`.
-
-Same unvalidated-length-presizes-a-buffer pattern (caught, so DoS rather than corruption, but still
-amplifies a few bytes into multi-GB allocations):
-- `Formats/Wkb.cs:202-203` (`ReadCoordinates`), `:190-191` (`ReadRings`), `:131,142,153,164`
-- `Formats/FlatGeobuf.cs:221` (`ReadProperties`), `:168`
-- `Formats/GeoParquet.cs:89`, `:156` (`NumRows`)
-
-`Snappy.Decompress` (`Snappy.cs:43`) already does this correctly with its 64× bound — use it as the
-model.
-
 ## 5. Exception contract violations
 
 CLAUDE.md states errors are surfaced as `GeoConvertException`. These leak raw BCL exceptions:

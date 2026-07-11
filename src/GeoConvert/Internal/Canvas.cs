@@ -2,8 +2,9 @@
 sealed class Canvas : IDisposable, IRenderSurface
 {
     // Reused across FillPolygon calls so a render with hundreds of polygons doesn't allocate a fresh
-    // set of crossings lists per call — one list per vertical sub-scanline (see fillSubSamples). The
-    // parallel path gets its own per-thread set instead, since rows run concurrently.
+    // set of crossings lists per call — one list per vertical sub-scanline (see fillSubSamples).
+    // FillPolygon runs single-threaded (the caller serialises polygons for source-over ordering), so a
+    // single shared set is safe.
     readonly List<double>[] scanlineCrossings = MakeCrossings();
 
     static List<double>[] MakeCrossings()
@@ -18,10 +19,46 @@ sealed class Canvas : IDisposable, IRenderSurface
     }
 
     // Per-row fractional-coverage accumulator for the antialiased polygon fill (one double per pixel
-    // column). Rented once per Canvas and reused for every serial FillPolygon row — the parallel path
-    // gets its own per-thread buffer instead, since rows run concurrently. Only the [clearLo, clearHi]
+    // column). Rented once per Canvas and reused for every FillPolygon row. Only the [clearLo, clearHi]
     // span actually touched by a polygon is cleared and read each row, so the stale tail is irrelevant.
     readonly double[] coverageBuffer;
+
+    // Active-edge-table scratch for FillPolygon, reused across calls and grown on demand (FillPolygon
+    // runs single-threaded). The AET replaces the former per-row walk of *every* edge — O(edges × rows),
+    // where all but the ~2 edges spanning a given row were rejected by the straddle test — with a per-row
+    // walk of only the edges active on that row: each edge is bucketed by the first row it can cross and
+    // carried in `activeEdges` until its extent ends. Total edge visits drop to roughly the number of
+    // (edge, row-it-spans) pairs. The crossing math per visit is unchanged, so the rendered pixels are
+    // byte-for-byte identical to the full walk.
+    FillEdge[] fillEdges = new FillEdge[64];
+
+    // CSR bucketing of edges by activation row: edgeRowStart[r]..edgeRowStart[r+1] indexes into
+    // edgeRowEntries for the edges that first become active on canvas row (first + r). edgeRowCursor is a
+    // scratch copy of the offsets used while scattering.
+    int[] edgeRowStart = new int[65];
+    int[] edgeRowEntries = new int[64];
+    int[] edgeRowCursor = new int[64];
+
+    // Working set of edge indices active on the row currently being filled.
+    int[] activeEdges = new int[64];
+
+    struct FillEdge
+    {
+        public double AX;
+        public double AY;
+        public double BX;
+        public double BY;
+        public int RowLo;
+        public int RowHi;
+    }
+
+    static void EnsureCapacity<T>(ref T[] array, int needed)
+    {
+        if (array.Length < needed)
+        {
+            array = new T[Math.Max(needed, array.Length * 2)];
+        }
+    }
 
     // The logical pixel-buffer size (width × height × 4 bytes). May be smaller than Pixels.Length —
     // ArrayPool returns arrays at least the requested size, potentially larger — so anything reading
@@ -481,6 +518,13 @@ sealed class Canvas : IDisposable, IRenderSurface
 
         var first = Math.Max(0, (int)Math.Floor(minY));
         var last = Math.Min(Height - 1, (int)Math.Floor(maxY));
+        if (last < first)
+        {
+            // Whole polygon lies above the top or below the bottom of the canvas — nothing to paint.
+            // (X is already bounded by the clearHi < clearLo guard above.)
+            return;
+        }
+
         var opaque = color.A == 255;
         var packed = Pack(color);
         // Precompute alpha factors once per polygon — the per-pixel/per-span blend avoids a division
@@ -492,38 +536,98 @@ sealed class Canvas : IDisposable, IRenderSurface
         var preB = color.B * a;
         var preA = (double)color.A;
 
-        // Per-polygon scanline parallelism. Each y writes to disjoint pixel rows so there's no data
-        // race across threads within a single FillPolygon (different polygons in the same render
-        // are still serialised by the caller — order matters for source-over). The threshold
-        // gates out small polygons where Parallel.For's per-iter overhead dominates the row work;
-        // measured tipping point on a modern x86 is ~64 rows. Below threshold the serial path
-        // reuses the class-level crossings list and coverage buffer (no allocation per render);
-        // above it each thread gets its own pair via the localInit factory.
-        if (last - first + 1 >= parallelScanlineThreshold)
+        // Build the active-edge table: bucket every non-horizontal edge by the first canvas row on which
+        // it can cross a sub-scanline, so each row processes only the edges spanning it rather than
+        // re-walking every edge (the former O(edges × rows) hot path). Horizontal edges (AY == BY) never
+        // satisfy the half-open straddle test, so they are dropped. An edge's row range is the floor of
+        // its y-extent clamped to the visible band [first, last]; that range is a superset of the rows it
+        // actually crosses, and the exact per-sub straddle test in FillScanRow still filters within it, so
+        // the accumulated crossings — and the composited pixels — are identical to a full edge walk.
+        var rowCount = last - first + 1;
+        EnsureCapacity(ref edgeRowStart, rowCount + 1);
+        Array.Clear(edgeRowStart, 0, rowCount + 1);
+
+        var vertexCount = 0;
+        foreach (var ring in rings)
         {
-            Parallel.For(
-                first,
-                last + 1,
-                () => (Crossings: MakeCrossings(), Coverage: new double[Width]),
-                (y, _, scratch) =>
-                {
-                    FillScanline(y, scratch.Crossings, scratch.Coverage, rings, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
-                    return scratch;
-                },
-                _ => { });
+            vertexCount += ring.Length;
         }
-        else
+
+        EnsureCapacity(ref fillEdges, vertexCount);
+        var edgeCount = 0;
+        foreach (var ring in rings)
         {
-            for (var y = first; y <= last; y++)
+            for (var i = 0; i < ring.Length; i++)
             {
-                FillScanline(y, scanlineCrossings, coverageBuffer, rings, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
+                var pa = ring[i];
+                var pb = ring[i + 1 == ring.Length ? 0 : i + 1];
+                if (pa.Y == pb.Y)
+                {
+                    // Horizontal edge — never straddles a scanline under the half-open rule.
+                    continue;
+                }
+
+                var rowLo = Math.Max(first, (int)Math.Floor(Math.Min(pa.Y, pb.Y)));
+                var rowHi = Math.Min(last, (int)Math.Floor(Math.Max(pa.Y, pb.Y)));
+                if (rowHi < rowLo)
+                {
+                    // Edge lies entirely above or below the visible row band.
+                    continue;
+                }
+
+                fillEdges[edgeCount] = new() { AX = pa.X, AY = pa.Y, BX = pb.X, BY = pb.Y, RowLo = rowLo, RowHi = rowHi };
+                edgeCount++;
+                // Tally into the activation-row bucket (shifted one slot right so the prefix sum below
+                // turns these counts into start offsets in place).
+                edgeRowStart[rowLo - first + 1]++;
             }
         }
-    }
 
-    // ~64 rows is where Parallel.For's per-iter overhead breaks even with the row work on an
-    // 8-core x86. Tune downward if profile shows under-utilisation at this threshold.
-    const int parallelScanlineThreshold = 64;
+        // Prefix-sum the per-row tallies into CSR start offsets (edgeRowStart[rowCount] == edgeCount).
+        for (var r = 0; r < rowCount; r++)
+        {
+            edgeRowStart[r + 1] += edgeRowStart[r];
+        }
+
+        EnsureCapacity(ref edgeRowEntries, Math.Max(edgeCount, 1));
+        EnsureCapacity(ref activeEdges, Math.Max(edgeCount, 1));
+        EnsureCapacity(ref edgeRowCursor, rowCount);
+        Array.Copy(edgeRowStart, edgeRowCursor, rowCount);
+        for (var e = 0; e < edgeCount; e++)
+        {
+            edgeRowEntries[edgeRowCursor[fillEdges[e].RowLo - first]++] = e;
+        }
+
+        // Sweep rows top to bottom, carrying the active set forward: add the edges that activate on this
+        // row, drop the ones whose extent ended above it, then accumulate coverage from just those edges.
+        var activeCount = 0;
+        for (var y = first; y <= last; y++)
+        {
+            var bucket = y - first;
+            for (var k = edgeRowStart[bucket]; k < edgeRowStart[bucket + 1]; k++)
+            {
+                activeEdges[activeCount] = edgeRowEntries[k];
+                activeCount++;
+            }
+
+            // Swap-remove edges whose y-extent ended above this row. Order is irrelevant — each
+            // sub-scanline's crossings are sorted before use.
+            for (var j = 0; j < activeCount;)
+            {
+                if (fillEdges[activeEdges[j]].RowHi < y)
+                {
+                    activeCount--;
+                    activeEdges[j] = activeEdges[activeCount];
+                }
+                else
+                {
+                    j++;
+                }
+            }
+
+            FillScanRow(y, activeCount, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
+        }
+    }
 
     // Vertical sub-scanlines per output row. Four gives four levels of vertical antialiasing on
     // near-horizontal edges and (combined with the analytic horizontal coverage) smooth diagonals,
@@ -531,16 +635,17 @@ sealed class Canvas : IDisposable, IRenderSurface
     // covered pixel sums to exactly 1.0 and stays on the fast composite path.
     const int fillSubSamples = 4;
 
-    // Accumulates one antialiased scanline: walks every ring's edges once, and for each edge records
-    // its x-crossing into the list for every sub-scanline of this row that the edge straddles (so the
-    // edge arrays are traversed once per row, not once per sub-scanline). Each sub-scanline's crossings
-    // are then sorted and turned into fractional coverage for the runs between paired crossings
-    // (even-odd rule) accumulated into `coverage`; finally the row's coverage is composited into the
-    // pixel buffer. `crossings` (one list per sub-scanline) and `coverage` are the caller's reusable
-    // scratch (class-level for serial, per-thread for parallel). Only the [clearLo, clearHi] column
-    // span — the polygon's pixel x-extent — is cleared and composited.
-    void FillScanline(int y, List<double>[] crossings, double[] coverage, (double X, double Y)[][] rings, Rgba color, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse, int clearLo, int clearHi)
+    // Accumulates one antialiased scanline from the row's active edges: for each edge records its
+    // x-crossing into the list for every sub-scanline of this row that the edge straddles. Each
+    // sub-scanline's crossings are then sorted and turned into fractional coverage for the runs between
+    // paired crossings (even-odd rule) accumulated into `coverageBuffer`; finally the row's coverage is
+    // composited into the pixel buffer. `scanlineCrossings` (one list per sub-scanline) and
+    // `coverageBuffer` are the reusable class-level scratch. Only the [clearLo, clearHi] column span —
+    // the polygon's pixel x-extent — is cleared and composited.
+    void FillScanRow(int y, int activeCount, Rgba color, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse, int clearLo, int clearHi)
     {
+        var coverage = coverageBuffer;
+        var crossings = scanlineCrossings;
         coverage.AsSpan(clearLo, clearHi - clearLo + 1).Clear();
 
         foreach (var list in crossings)
@@ -548,24 +653,20 @@ sealed class Canvas : IDisposable, IRenderSurface
             list.Clear();
         }
 
-        foreach (var ring in rings)
+        for (var j = 0; j < activeCount; j++)
         {
-            for (var i = 0; i < ring.Length; i++)
+            ref var edge = ref fillEdges[activeEdges[j]];
+            for (var sub = 0; sub < fillSubSamples; sub++)
             {
-                var pa = ring[i];
-                var pb = ring[i + 1 == ring.Length ? 0 : i + 1];
-                for (var sub = 0; sub < fillSubSamples; sub++)
+                var scan = y + (sub + 0.5) / fillSubSamples;
+                if ((!(edge.AY <= scan) || !(edge.BY > scan)) &&
+                    (!(edge.BY <= scan) || !(edge.AY > scan)))
                 {
-                    var scan = y + (sub + 0.5) / fillSubSamples;
-                    if ((!(pa.Y <= scan) || !(pb.Y > scan)) &&
-                        (!(pb.Y <= scan) || !(pa.Y > scan)))
-                    {
-                        continue;
-                    }
-
-                    var t = (scan - pa.Y) / (pb.Y - pa.Y);
-                    crossings[sub].Add(pa.X + t * (pb.X - pa.X));
+                    continue;
                 }
+
+                var t = (scan - edge.AY) / (edge.BY - edge.AY);
+                crossings[sub].Add(edge.AX + t * (edge.BX - edge.AX));
             }
         }
 

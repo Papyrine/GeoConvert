@@ -16,14 +16,29 @@ public static class GeoJson
 
     internal static FeatureCollection Read(Stream stream, ProgressReporter? progress)
     {
-        using var document = JsonDocument.Parse(stream);
-        return Read(document.RootElement, progress);
+        try
+        {
+            using var document = JsonDocument.Parse(stream);
+            return Read(document.RootElement, progress);
+        }
+        catch (GeoConvertException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // Malformed JSON (JsonException), a missing "coordinates" member (KeyNotFoundException) or a
+            // coordinate array with too few ordinates (InvalidOperationException) all surface here as the
+            // documented exception type, matching WKB/KML/GPX.
+            throw new GeoConvertException($"Invalid GeoJSON data: {exception.Message}");
+        }
     }
 
     public static FeatureCollection ReadString(string text)
     {
-        using var document = JsonDocument.Parse(text);
-        return Read(document.RootElement, null);
+        // Route through the stream reader so parsing and its error-wrapping live in one place.
+        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(text));
+        return Read(stream, null);
     }
 
     static FeatureCollection Read(JsonElement root, ProgressReporter? progress)

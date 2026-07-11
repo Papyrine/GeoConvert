@@ -111,11 +111,60 @@ public class DefensiveTests
             GeoJson.ReadString("""{"type":"Feature","geometry":{"type":"Circle","coordinates":[1,2]}}"""))).IsTrue();
     }
 
+    // A Point whose "coordinates" is missing (KeyNotFoundException) or holds a single ordinate
+    // (InvalidOperationException off the array enumerator) used to leak the raw BCL type; the reader now
+    // funnels both through GeoConvertException. Malformed JSON syntax is wrapped by the same catch.
+    [Test]
+    [Arguments("""{"type":"Point"}""")]
+    [Arguments("""{"type":"Point","coordinates":[1]}""")]
+    [Arguments("{ not json")]
+    public async Task GeoJson_wraps_raw_parse_errors(string json) =>
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoJson.ReadString(json))).IsTrue();
+
     [Test]
     public async Task TopoJson_rejects_unknown_geometry()
     {
         const string topology =
             """{"type":"Topology","objects":{"d":{"type":"Circle"}},"arcs":[]}""";
         await Assert.That(TestSupport.ThrowsGeo(() => TopoJson.ReadString(topology))).IsTrue();
+    }
+
+    // A single-ordinate Point coordinate (DecodePoint) or transform pair (ReadPair) used to leak
+    // InvalidOperationException; both now surface as GeoConvertException.
+    [Test]
+    [Arguments("""{"type":"Topology","objects":{"d":{"type":"Point","coordinates":[1]}},"arcs":[]}""")]
+    [Arguments("""{"type":"Topology","transform":{"scale":[1],"translate":[0,0]},"objects":{},"arcs":[]}""")]
+    public async Task TopoJson_wraps_raw_parse_errors(string topology) =>
+        await Assert.That(TestSupport.ThrowsGeo(() => TopoJson.ReadString(topology))).IsTrue();
+
+    // A polygon record (shape type 5) whose content is too short for the part header makes ReadParts
+    // slice out of range — a raw ArgumentOutOfRangeException before the read path had a catch-all.
+    [Test]
+    public async Task Shapefile_wraps_a_corrupt_record()
+    {
+        var data = new byte[112];
+        // Record header (big-endian): record number 1, content length 2 words (4 bytes).
+        data[103] = 1;
+        data[107] = 2;
+        // Record content: shape type 5 (Polygon, little-endian) with nothing following it.
+        data[108] = 5;
+
+        using var stream = new MemoryStream(data);
+        await Assert.That(TestSupport.ThrowsGeo(() => Shapefile.Read(stream, null))).IsTrue();
+    }
+
+    // A record whose declared content length overflows int when doubled (0x40000000 words) used to slip
+    // past the bounds check and throw raw from AsSpan. The reader now stops at it, as it does a truncated
+    // record, returning the records read so far.
+    [Test]
+    public async Task Shapefile_stops_at_an_overflowing_record_length()
+    {
+        var data = new byte[108];
+        // Record header (big-endian): record number 1, content length 0x40000000 words.
+        data[103] = 1;
+        data[104] = 0x40;
+
+        using var stream = new MemoryStream(data);
+        await Assert.That(Shapefile.Read(stream, null).Count).IsEqualTo(0);
     }
 }

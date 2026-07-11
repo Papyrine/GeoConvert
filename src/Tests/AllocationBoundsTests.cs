@@ -95,8 +95,9 @@ public class AllocationBoundsTests
     [Test]
     public async Task Shapefile_surfaces_a_corrupt_dbf_as_GeoConvertException()
     {
-        // Dbf.Read is the one read path with no catch-all wrapper, so its own guards are what keep a raw
-        // IndexOutOfRangeException from escaping the public Shapefile API.
+        // Dbf.Read has no catch-all of its own; its bounds guards throw GeoConvertException directly (and
+        // Shapefile.Read now also wraps the whole read), so a corrupt .dbf surfaces as the documented type
+        // rather than a raw IndexOutOfRangeException.
         using var shp = new MemoryStream(new byte[100]);
         using var dbf = new MemoryStream(new byte[4]);
 

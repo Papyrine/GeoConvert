@@ -447,7 +447,12 @@ static class Dbf
             {
                 Name = name,
                 Type = 'N',
-                Length = (byte)Math.Clamp(maxLength, 1, 18),
+                // 20 = the widest a 64-bit integer ever formats to: long.MinValue
+                // ("-9223372036854775808") and ulong.MaxValue ("18446744073709551615") are both 20
+                // chars. The old cap of 18 silently truncated any value >= 10^18 — FitNumeric copies
+                // only the leading Length chars, so a 19-digit long wrote back short by a factor of
+                // ten or more. A DBF numeric field's single length byte holds 20 with room to spare.
+                Length = (byte)Math.Clamp(maxLength, 1, 20),
                 Decimals = 0
             };
         }

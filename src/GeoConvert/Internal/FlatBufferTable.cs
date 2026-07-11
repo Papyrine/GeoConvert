@@ -81,7 +81,16 @@ readonly struct FlatBufferTable(byte[] buffer, int position)
         return new(buffer, offset + BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(offset)));
     }
 
-    public int VectorLength(int field)
+    /// <summary>
+    /// Length in elements of the vector in <paramref name="field"/>, where one element occupies
+    /// <paramref name="elementSize"/> bytes.
+    /// </summary>
+    /// <remarks>
+    /// The length is read straight off the wire and callers presize collections from it, so an unchecked
+    /// one turns four bytes into a multi-gigabyte allocation before the first out-of-range element read
+    /// fails. A vector cannot declare more elements than the bytes following its own length prefix hold.
+    /// </remarks>
+    public int VectorLength(int field, int elementSize)
     {
         var offset = FieldOffset(field);
         if (offset == 0)
@@ -90,7 +99,16 @@ readonly struct FlatBufferTable(byte[] buffer, int position)
         }
 
         var start = offset + BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(offset));
-        return BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(start));
+        var length = BinaryPrimitives.ReadInt32LittleEndian(buffer.AsSpan(start));
+        var available = buffer.Length - (start + 4);
+        if (length < 0 ||
+            (long)length * elementSize > available)
+        {
+            throw new GeoConvertException(
+                $"FlatGeobuf vector declares {length} elements of {elementSize} bytes, but only {available} bytes follow it.");
+        }
+
+        return length;
     }
 
     int VectorElements(int field)
@@ -114,7 +132,7 @@ readonly struct FlatBufferTable(byte[] buffer, int position)
 
     public byte[] GetByteVector(int field)
     {
-        var length = VectorLength(field);
+        var length = VectorLength(field, elementSize: 1);
         if (length == 0)
         {
             return [];

@@ -53,10 +53,25 @@ public static class GeoParquet
         data[offset + 2] == magic[2] &&
         data[offset + 3] == magic[3];
 
-    static byte[] ReadAt(Stream stream, long offset, int count)
+    static byte[] ReadAt(Stream stream, long offset, long count)
     {
+        // Both come from the footer — and the footer's own length from the file trailer — so both are
+        // attacker-controlled. Presizing `buffer` from an unchecked count turns a handful of bytes into a
+        // multi-gigabyte allocation, and a negative one throws OverflowException rather than the
+        // documented type. Nothing valid reads outside the file. The last clause is `offset > length -
+        // count` rather than `offset + count > length` because a near-long.MaxValue offset would overflow
+        // the sum negative and sail through.
+        if (offset < 0 ||
+            count < 0 ||
+            count > Array.MaxLength ||
+            offset > stream.Length - count)
+        {
+            throw new GeoConvertException(
+                $"Parquet read of {count} bytes at offset {offset} lies outside the {stream.Length}-byte file.");
+        }
+
         stream.Position = offset;
-        var buffer = new byte[count];
+        var buffer = new byte[(int)count];
         stream.ReadExactly(buffer);
         return buffer;
     }
@@ -83,9 +98,23 @@ public static class GeoParquet
             }
         }
 
+        // NumRows comes from the footer and presizes one object?[] per column, so a corrupt or hostile
+        // value turns a handful of bytes into a multi-gigabyte allocation (and a negative one throws
+        // OverflowException rather than the documented type). Bound it against the file the way Snappy
+        // bounds its declared block size: even the most compressible real row costs far more than a
+        // 64th of a byte on disk.
+        var maximumRows = Math.Min(length * 64, Array.MaxLength);
+
         var collection = new FeatureCollection();
         foreach (var group in file.RowGroups)
         {
+            if (group.NumRows < 0 ||
+                group.NumRows > maximumRows)
+            {
+                throw new GeoConvertException(
+                    $"Parquet row group declares {group.NumRows} rows, more than a {length}-byte file can hold.");
+            }
+
             var rows = (int)group.NumRows;
             var columns = new Dictionary<string, object?[]>(StringComparer.Ordinal);
             foreach (var chunk in group.Columns)
@@ -94,7 +123,7 @@ public static class GeoParquet
                 var maxDefinition =
                     repetitions.GetValueOrDefault(name) == ParquetMetadata.RepetitionOptional ? 1 : 0;
                 var start = chunk.DictionaryPageOffset ?? chunk.DataPageOffset;
-                var chunkBytes = ReadAt(stream, start, (int)chunk.TotalCompressedSize);
+                var chunkBytes = ReadAt(stream, start, chunk.TotalCompressedSize);
                 columns[name] = ReadColumnChunk(chunkBytes, chunk.Codec, chunk.Type, maxDefinition, rows);
             }
 
@@ -169,9 +198,12 @@ public static class GeoParquet
 
             if (header.Type == ParquetMetadata.PageDictionary)
             {
-                dictionary = DecodePlain(Decompress(data, pageStart, header.CompressedSize, codec), 0, header.NumValues, type);
+                var page = Decompress(data, pageStart, header.CompressedSize, codec);
+                dictionary = DecodePlain(page, 0, CheckValueCount(header.NumValues, (long)page.Length * 8), type);
                 continue;
             }
+
+            var numValues = CheckValueCount(header.NumValues, rows - rowsRead);
 
             byte[] body;
             int valueOffset;
@@ -180,7 +212,7 @@ public static class GeoParquet
             {
                 // V2 stores levels uncompressed ahead of the (optionally compressed) values.
                 definitions = maxDefinition > 0
-                    ? ParquetEncoding.DecodeRle(data, pageStart + header.RepetitionLevelsByteLength, header.NumValues, 1)
+                    ? ParquetEncoding.DecodeRle(data, pageStart + header.RepetitionLevelsByteLength, numValues, 1)
                     : null;
                 var valueStart = header.RepetitionLevelsByteLength + header.DefinitionLevelsByteLength;
                 // Uncompressed values are sliced out via the no-op codec, so there is one decode path.
@@ -198,16 +230,16 @@ public static class GeoParquet
                 {
                     var definitionLength = BinaryPrimitives.ReadInt32LittleEndian(body.AsSpan(0));
                     valueOffset = 4;
-                    definitions = ParquetEncoding.DecodeRle(body, valueOffset, header.NumValues, 1);
+                    definitions = ParquetEncoding.DecodeRle(body, valueOffset, numValues, 1);
                     valueOffset += definitionLength;
                 }
             }
 
-            var present = definitions?.Count(level => level == maxDefinition) ?? header.NumValues;
+            var present = definitions?.Count(level => level == maxDefinition) ?? numValues;
             var pageValues = DecodePageValues(body, valueOffset, present, type, header, dictionary);
 
             var valueIndex = 0;
-            for (var i = 0; i < header.NumValues; i++)
+            for (var i = 0; i < numValues; i++)
             {
                 values[rowsRead++] = definitions == null || definitions[i] == maxDefinition
                     ? pageValues[valueIndex++]
@@ -216,6 +248,22 @@ public static class GeoParquet
         }
 
         return values;
+    }
+
+    // A page header's value count presizes the definition-level and value arrays below, so it gets the
+    // same treatment as the footer's row count. `bound` is the most values the page could legitimately
+    // hold: for a data page, the rows still to be filled; for a PLAIN-encoded dictionary page, eight per
+    // decompressed byte — the one-bit BOOLEAN floor.
+    static int CheckValueCount(int numValues, long bound)
+    {
+        if (numValues < 0 ||
+            numValues > bound)
+        {
+            throw new GeoConvertException(
+                $"Parquet page declares {numValues} values, more than the {bound} it can hold.");
+        }
+
+        return numValues;
     }
 
     static object[] DecodePageValues(

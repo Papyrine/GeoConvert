@@ -70,8 +70,26 @@ public class DefensiveTests
     [Test]
     public async Task GeoParquet_rejects_corrupt_footer()
     {
-        // Valid PAR1 magic at both ends but a footer length that points outside the buffer.
+        // Valid PAR1 magic at both ends but a footer length that points outside the buffer. Reading it
+        // used to presize a 2 GB byte[] before failing; ReadAt now rejects it against the file length.
         byte[] data = [0x50, 0x41, 0x52, 0x31, 0xFF, 0xFF, 0xFF, 0x7F, 0x50, 0x41, 0x52, 0x31];
+        using var stream = new MemoryStream(data);
+        await Assert.That(TestSupport.ThrowsGeo(() => GeoParquet.Read(stream))).IsTrue();
+    }
+
+    [Test]
+    public async Task GeoParquet_rejects_malformed_footer_thrift()
+    {
+        // Valid magic and an in-bounds one-byte footer, but its Thrift bytes run out mid-field: the
+        // header claims an i32 (Version) whose varint never arrives. The reader raises
+        // IndexOutOfRangeException, which the codec's catch-all restates as GeoConvertException.
+        byte[] data =
+        [
+            0x50, 0x41, 0x52, 0x31,
+            0x15,
+            0x01, 0x00, 0x00, 0x00,
+            0x50, 0x41, 0x52, 0x31,
+        ];
         using var stream = new MemoryStream(data);
         await Assert.That(TestSupport.ThrowsGeo(() => GeoParquet.Read(stream))).IsTrue();
     }

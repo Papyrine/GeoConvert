@@ -32,6 +32,12 @@ public static class FlatGeobuf
     const int columnName = 0;
     const int columnType = 1;
 
+    // Element widths of the vectors read below, so VectorLength can reject a declared length the buffer
+    // cannot possibly hold: FlatBuffers offsets and the `ends` uints are 4 bytes, xy ordinates 8.
+    const int offsetBytes = 4;
+    const int endBytes = 4;
+    const int ordinateBytes = 8;
+
     readonly record struct Column(string Name, byte Type);
 
     public static FeatureCollection Read(Stream stream) =>
@@ -82,7 +88,7 @@ public static class FlatGeobuf
         var header = ReadSizePrefixed(data, length, ref position);
 
         var columns = new List<Column>();
-        var columnCount = header.VectorLength(headerColumns);
+        var columnCount = header.VectorLength(headerColumns, offsetBytes);
         for (var i = 0; i < columnCount; i++)
         {
             var column = header.GetTableElement(headerColumns, i);
@@ -160,7 +166,7 @@ public static class FlatGeobuf
     static List<Geometry> ReadParts(FlatBufferTable table, int depth)
     {
         var parts = new List<Geometry>();
-        var count = table.VectorLength(geometryParts);
+        var count = table.VectorLength(geometryParts, offsetBytes);
         for (var i = 0; i < count; i++)
         {
             parts.Add(ReadGeometry(table.GetTableElement(geometryParts, i), 0, depth + 1));
@@ -171,7 +177,7 @@ public static class FlatGeobuf
 
     static List<Position> ReadPositions(FlatBufferTable table)
     {
-        var length = table.VectorLength(geometryXy);
+        var length = table.VectorLength(geometryXy, ordinateBytes);
         var positions = new List<Position>(length / 2);
         for (var i = 0; i < length; i += 2)
         {
@@ -183,11 +189,13 @@ public static class FlatGeobuf
 
     static List<IReadOnlyList<Position>> SplitRings(FlatBufferTable table)
     {
-        var endsLength = table.VectorLength(geometryEnds);
+        var endsLength = table.VectorLength(geometryEnds, endBytes);
         if (endsLength == 0)
         {
             return [ReadPositions(table)];
         }
+
+        var pointCount = table.VectorLength(geometryXy, ordinateBytes) / 2;
 
         // Materialise each ring directly from the xy vector instead of reading one flat list and then
         // copying ranges out of it — saves O(points) of duplicated allocations on multi-ring geometries.
@@ -196,6 +204,16 @@ public static class FlatGeobuf
         for (var i = 0; i < endsLength; i++)
         {
             var end = (int) table.GetUIntElement(geometryEnds, i);
+            // `end - start` is what presizes the ring, and `end` is read straight off the wire: a crafted
+            // value reserves gigabytes, or goes negative once the uint casts, before the first coordinate
+            // read fails. Ends have to climb and to stay inside the coordinates actually present.
+            if (end < start ||
+                end > pointCount)
+            {
+                throw new GeoConvertException(
+                    $"FlatGeobuf ring end {end} must fall between the previous ring's end ({start}) and the {pointCount} coordinates present.");
+            }
+
             var ring = new List<Position>(end - start);
             for (var p = start; p < end; p++)
             {
@@ -225,9 +243,25 @@ public static class FlatGeobuf
                 columnBool => reader.ReadByte() != 0,
                 columnLong => reader.ReadInt64(),
                 columnDouble => reader.ReadDouble(),
-                _ => Encoding.UTF8.GetString(reader.ReadBytes((int) reader.ReadUInt32())),
+                _ => Encoding.UTF8.GetString(reader.ReadBytes(StringLength(reader, memory))),
             };
         }
+    }
+
+    // BinaryReader.ReadBytes presizes its array from the count, so the on-the-wire string length has to
+    // be bounded before it becomes a multi-gigabyte allocation: it cannot exceed the bytes left in the
+    // property blob.
+    static int StringLength(BinaryReader reader, MemoryStream memory)
+    {
+        var declared = reader.ReadUInt32();
+        var remaining = memory.Length - memory.Position;
+        if (declared > remaining)
+        {
+            throw new GeoConvertException(
+                $"FlatGeobuf property string declares {declared} bytes but only {remaining} remain.");
+        }
+
+        return (int) declared;
     }
 
     static FlatBufferTable ReadSizePrefixed(byte[] data, int length, ref int position)

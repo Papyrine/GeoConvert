@@ -12,6 +12,12 @@ public static class Wkb
     const uint ewkbM = 0x40000000;
     const uint ewkbSrid = 0x20000000;
 
+    // The fewest bytes a nested geometry can occupy: 1 byte order + 4 type code.
+    const int minimumGeometryBytes = 5;
+
+    // The fewest bytes a ring can occupy: its own 4-byte coordinate count.
+    const int minimumRingBytes = 4;
+
     // A forward cursor over the WKB buffer: reads scalars directly from the span via BinaryPrimitives, so
     // no per-value byte[] is allocated and endianness is handled without copying/reversing.
     ref struct Cursor(ReadOnlySpan<byte> data)
@@ -20,6 +26,8 @@ public static class Wkb
         int position;
 
         public readonly bool AtEnd => position >= data.Length;
+
+        public readonly int Remaining => data.Length - position;
 
         public byte ReadByte() => data[position++];
 
@@ -132,8 +140,8 @@ public static class Wkb
                 return new Polygon(ReadRings(ref cursor, little, hasZ, hasM));
             case 4:
             {
-                var count = cursor.ReadUInt32(little);
-                var positions = new List<Position>((int)count);
+                var count = ReadCount(ref cursor, little, minimumGeometryBytes, "points");
+                var positions = new List<Position>(count);
                 for (var i = 0; i < count; i++)
                 {
                     positions.Add(ExpectSubGeometry<Point>(ReadGeometry(ref cursor, depth + 1), "MultiPoint").Coordinate);
@@ -143,8 +151,8 @@ public static class Wkb
             }
             case 5:
             {
-                var count = cursor.ReadUInt32(little);
-                var lines = new List<LineString>((int)count);
+                var count = ReadCount(ref cursor, little, minimumGeometryBytes, "line strings");
+                var lines = new List<LineString>(count);
                 for (var i = 0; i < count; i++)
                 {
                     lines.Add(ExpectSubGeometry<LineString>(ReadGeometry(ref cursor, depth + 1), "MultiLineString"));
@@ -154,8 +162,8 @@ public static class Wkb
             }
             case 6:
             {
-                var count = cursor.ReadUInt32(little);
-                var polygons = new List<Polygon>((int)count);
+                var count = ReadCount(ref cursor, little, minimumGeometryBytes, "polygons");
+                var polygons = new List<Polygon>(count);
                 for (var i = 0; i < count; i++)
                 {
                     polygons.Add(ExpectSubGeometry<Polygon>(ReadGeometry(ref cursor, depth + 1), "MultiPolygon"));
@@ -165,8 +173,8 @@ public static class Wkb
             }
             case 7:
             {
-                var count = cursor.ReadUInt32(little);
-                var geometries = new List<Geometry>((int)count);
+                var count = ReadCount(ref cursor, little, minimumGeometryBytes, "geometries");
+                var geometries = new List<Geometry>(count);
                 for (var i = 0; i < count; i++)
                 {
                     geometries.Add(ReadGeometry(ref cursor, depth + 1));
@@ -190,10 +198,26 @@ public static class Wkb
             $"WKB {container} expected a {typeof(T).Name} sub-geometry but got {geometry.Type}.");
     }
 
+    // An element count is read straight off the wire and then presizes a List, so an unchecked one turns
+    // four bytes into a multi-gigabyte allocation — or, once the uint casts negative, an
+    // ArgumentOutOfRangeException — long before the first out-of-range read fails. Nothing valid can
+    // declare more elements than the bytes left could hold at the element's smallest encoded size.
+    static int ReadCount(ref Cursor cursor, bool little, int minimumElementBytes, string element)
+    {
+        var count = cursor.ReadUInt32(little);
+        if (count > (uint)(cursor.Remaining / minimumElementBytes))
+        {
+            throw new GeoConvertException(
+                $"WKB declares {count} {element} but only {cursor.Remaining} bytes remain.");
+        }
+
+        return (int)count;
+    }
+
     static List<IReadOnlyList<Position>> ReadRings(ref Cursor cursor, bool little, bool hasZ, bool hasM)
     {
-        var ringCount = cursor.ReadUInt32(little);
-        var rings = new List<IReadOnlyList<Position>>((int)ringCount);
+        var ringCount = ReadCount(ref cursor, little, minimumRingBytes, "rings");
+        var rings = new List<IReadOnlyList<Position>>(ringCount);
         for (var i = 0; i < ringCount; i++)
         {
             rings.Add(ReadCoordinates(ref cursor, little, hasZ, hasM));
@@ -204,8 +228,10 @@ public static class Wkb
 
     static List<Position> ReadCoordinates(ref Cursor cursor, bool little, bool hasZ, bool hasM)
     {
-        var count = cursor.ReadUInt32(little);
-        var positions = new List<Position>((int)count);
+        // X and Y always, then 8 bytes for each of the optional Z and M ordinates.
+        var coordinateBytes = 16 + (hasZ ? 8 : 0) + (hasM ? 8 : 0);
+        var count = ReadCount(ref cursor, little, coordinateBytes, "coordinates");
+        var positions = new List<Position>(count);
         for (var i = 0; i < count; i++)
         {
             positions.Add(ReadCoordinate(ref cursor, little, hasZ, hasM));

@@ -5,14 +5,15 @@ namespace GeoConvert.Benchmarks;
 /// non-interrupted one. Each pair renders the *same* world-spanning geometry at the same size with
 /// deflate disabled (<see cref="CompressionLevel.NoCompression"/>), so the Goode − PlateCarree
 /// delta is exactly the <c>GoodeLobes</c> work: Sutherland-Hodgman ring clipping
-/// (<c>ClipRingWithTags</c>), polyline boundary subdivision (<c>SubdividePath</c> /
-/// <c>InterpolateToBoundary</c>), and per-lobe projection.
+/// (<c>ClipRingWithTags</c>), polyline boundary subdivision (<c>SubdividePath</c>), and per-lobe
+/// projection.
 /// <para>
 /// Run before/after any GoodeLobes change to see whether a tweak actually moves the needle. The
-/// MemoryDiagnoser <c>Allocated</c> column is the direct read on the LINQ question: the
-/// <c>Lines_Goode</c> row is where <c>InterpolateToBoundary</c> fires, so its allocation delta over
-/// <c>Lines_PlateCarree</c> shows what the SelectMany/First/Any churn actually costs — if it's a
-/// rounding error against total render allocations, the LINQ there isn't worth hand-rolling.
+/// <c>Lines_Goode</c> row is the one that drives <c>SubdividePath</c>, which sweeps every segment
+/// against every lobe boundary plane; the MemoryDiagnoser <c>Allocated</c> delta over
+/// <c>Lines_PlateCarree</c> is the per-path crossing buffer plus one <c>List</c> per emitted
+/// subpath. If that delta is a rounding error against total render allocations, pooling either of
+/// them isn't worth the reentrancy hazard.
 /// </para>
 /// </summary>
 [MemoryDiagnoser]
@@ -67,8 +68,8 @@ public class GoodeRenderBenchmarks
     public int Lines_PlateCarree() =>
         MapRenderer.RenderPng(lines, plateCarree).Length;
 
-    // Same lines through Goode — adds SubdividePath / InterpolateToBoundary. Delta over
-    // Lines_PlateCarree (especially the Allocated column) is the boundary-crossing LINQ cost.
+    // Same lines through Goode — adds SubdividePath. Delta over Lines_PlateCarree (especially the
+    // Allocated column) is the boundary-crossing cost.
     [Benchmark]
     public int Lines_Goode() =>
         MapRenderer.RenderPng(lines, goode).Length;

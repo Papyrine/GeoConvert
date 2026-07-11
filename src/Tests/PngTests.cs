@@ -733,7 +733,7 @@ public class PngTests
     public async Task Goode_splits_linestring_at_equator()
     {
         // A polyline crossing the equator hops between hemispheres, so PrepareLine must split it
-        // at lat=0 — InterpolateToBoundary's hemisphere branch picks up the crossing point.
+        // at lat=0 — SubdividePath's plane sweep picks up the crossing point.
         // Without the split, the line would still render (since the equator transition is smooth
         // in projected x at a fixed lon), but the lobe assignment for stroking would be wrong;
         // this test just confirms the split path is reached for the coverage gate.
@@ -749,6 +749,38 @@ public class PngTests
                 Bounds = new Envelope(-180, -90, 180, 90),
                 Width = 800,
                 Projection = MapProjection.Goode,
+            });
+
+        var (_, _, pixels) = Decode(png);
+        await Assert.That(NonBackgroundCount(pixels)).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task Goode_renders_a_world_graticule_under_the_default_projection()
+    {
+        // A graticule over world bounds is the everyday case that Resolve hands to Goode without
+        // the caller ever naming it. Its meridians run due north through the lat=60° Greenland
+        // step (a lobe change with no shared meridian to split on), and its parallels are single
+        // segments spanning three southern lobes at once (a lobe change that skips a lobe). Both
+        // used to throw out of SubdividePath.
+        var features = new FeatureCollection();
+        for (var lon = -180; lon <= 180; lon += 30)
+        {
+            features.Add(new Feature(new LineString([new(lon, -90), new(lon, 90)])));
+        }
+
+        for (var lat = -60; lat <= 60; lat += 30)
+        {
+            features.Add(new Feature(new LineString([new(-180, lat), new(180, lat)])));
+        }
+
+        var png = MapRenderer.RenderPng(
+            features,
+            new()
+            {
+                Bounds = new Envelope(-180, -90, 180, 90),
+                Width = 800,
+                Projection = MapProjection.Auto,
             });
 
         var (_, _, pixels) = Decode(png);

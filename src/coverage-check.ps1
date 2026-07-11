@@ -30,8 +30,9 @@ foreach ($package in $coverage.coverage.packages.package)
         # contain a single /src/ segment, so stripping through it yields the repo-relative path.
         $relative = ($file -replace '\\', '/') -replace '^.*/src/', ''
 
-        # Scope to the shipped projects (GeoConvert + GeoConvert.Cli); excludes the test project etc.
-        if ($relative -notmatch '^GeoConvert(\.Cli)?/')
+        # Scope to the shipped projects; excludes the test project etc. Listed rather than globbed on
+        # GeoConvert* so the sample web app and the WinForms app never creep into the gate.
+        if ($relative -notmatch '^GeoConvert(\.Cli|\.Skia|\.ImageSharp)?/')
         {
             continue
         }

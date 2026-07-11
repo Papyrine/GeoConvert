@@ -22,7 +22,9 @@
 /// an arc (one traversing it forward, one backward) get bit-identical simplified vertices for
 /// that arc.</item>
 /// <item>Reassemble each chain by concatenating its simplified arcs, skipping the duplicated
-/// junction vertex where consecutive arcs meet.</item>
+/// junction vertex where consecutive arcs meet. A ring whose arcs all collapse to their junctions
+/// reassembles below a valid triangle — the per-arc floor of two points can't see the ring it is
+/// building — so it falls back to whole-ring simplification, floored at four positions.</item>
 /// </list>
 /// Per the algorithm: identical input across both occurrences ⇒ identical output ⇒ shared
 /// boundary preserved exactly. The dictionary of (original-chain-ref ⇒ simplified-chain) is then
@@ -287,7 +289,41 @@ static class TopologySimplifier
             }
         }
 
+        // Each arc is thinned as an *open line*, so its floor is 2 points — its own two junctions.
+        // Nothing in that per-arc floor knows it is assembling a ring, so a ring whose every arc
+        // falls within the tolerance reassembles below a triangle. Two rings sharing one edge (each
+        // splits into exactly two arcs between the same junction pair) collapse to (j0, j1, j0):
+        // three positions, zero area, and an invalid linear ring — RFC 7946 §3.1.6 requires four.
+        // The arc-wise answer is unusable at that point, so fall back to the closed-ring simplifier,
+        // whose minPoints = 4 floors it at the minimal valid triangle exactly as plain Simplify does.
+        if (IsDegenerateRing(result))
+        {
+            return LineSimplifier.Simplify(ring, tolerance, method, 4);
+        }
+
         return result;
+    }
+
+    // A valid linear ring is four or more positions spanning at least three distinct vertices.
+    // Reassembly always restores closure (the last arc ends on the first arc's leading junction),
+    // so only the vertex count can fail. Both checks are needed: two arcs between one junction pair
+    // give three positions, while a self-touching ring whose junction repeats can reach four
+    // positions with only two distinct vertices.
+    static bool IsDegenerateRing(List<Position> ring)
+    {
+        if (ring.Count < 4)
+        {
+            return true;
+        }
+
+        // Skip the closing vertex — it repeats the first by construction.
+        var distinct = new HashSet<Position>();
+        for (var i = 0; i < ring.Count - 1; i++)
+        {
+            distinct.Add(ring[i]);
+        }
+
+        return distinct.Count < 3;
     }
 
     static IReadOnlyList<Position> SimplifyLine(IReadOnlyList<Position> line, HashSet<Position> junctions, double tolerance, SimplifyMethod method)

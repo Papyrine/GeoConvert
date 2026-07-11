@@ -4,24 +4,44 @@
 public class SnapshotTests
 {
     static WebApplication? app;
+    static WebApplication? bareApp;
     static int port;
+    static int barePort;
     static IPlaywright? playwright;
     static IBrowser? browser;
 
     [Before(Class)]
     public static async Task OneTimeSetUp()
     {
-        port = GetAvailablePort();
+        var ports = GetAvailablePorts(2);
+        port = ports[0];
+        barePort = ports[1];
 
+        // The published app uses the multithreaded WASM runtime, which needs SharedArrayBuffer — only
+        // exposed to a cross-origin-isolated page. `app` sets the COOP/COEP headers so the runtime boots
+        // straight away; `bareApp` sends no such headers, standing in for GitHub Pages (which can't set
+        // them) so the coi.js service-worker path is exercised too.
+        app = StartServer(port, isolationHeaders: true);
+        bareApp = StartServer(barePort, isolationHeaders: false);
+
+        await app.StartAsync();
+        await bareApp.StartAsync();
+
+        playwright = await Playwright.CreateAsync();
+        browser = await playwright.Chromium.LaunchAsync();
+    }
+
+    static WebApplication StartServer(int listenPort, bool isolationHeaders)
+    {
         // Use pre-published output from build (see csproj PublishBlazorForTests target)
         var testAssemblyDir = Path.GetDirectoryName(typeof(SnapshotTests).Assembly.Location)!;
         var wwwrootPath = Path.Combine(testAssemblyDir, "..", "blazor-publish", "wwwroot");
 
         var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseUrls($"http://localhost:{port}");
+        builder.WebHost.UseUrls($"http://localhost:{listenPort}");
         builder.Logging.ClearProviders();
 
-        app = builder.Build();
+        var server = builder.Build();
 
         var contentTypeProvider = new FileExtensionContentTypeProvider
         {
@@ -33,22 +53,22 @@ public class SnapshotTests
 
         var fileProvider = new PhysicalFileProvider(wwwrootPath);
 
-        // The published app uses the multithreaded WASM runtime, which needs SharedArrayBuffer — only
-        // exposed to a cross-origin-isolated page. Set the COOP/COEP headers here so the runtime boots
-        // under Playwright (in production the coi.js service worker supplies them on GitHub Pages).
-        app.Use((context, next) =>
+        if (isolationHeaders)
         {
-            context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
-            context.Response.Headers["Cross-Origin-Embedder-Policy"] = "require-corp";
-            return next();
-        });
+            server.Use((context, next) =>
+            {
+                context.Response.Headers["Cross-Origin-Opener-Policy"] = "same-origin";
+                context.Response.Headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+                return next();
+            });
+        }
 
-        app.UseDefaultFiles(
+        server.UseDefaultFiles(
             new DefaultFilesOptions
             {
                 FileProvider = fileProvider
             });
-        app.UseStaticFiles(
+        server.UseStaticFiles(
             new StaticFileOptions
             {
                 FileProvider = fileProvider,
@@ -56,17 +76,14 @@ public class SnapshotTests
                 ServeUnknownFileTypes = true
             });
 
-        app.MapFallbackToFile(
+        server.MapFallbackToFile(
             "index.html",
             new StaticFileOptions
             {
                 FileProvider = fileProvider
             });
 
-        await app.StartAsync();
-
-        playwright = await Playwright.CreateAsync();
-        browser = await playwright.Chromium.LaunchAsync();
+        return server;
     }
 
     [After(Class)]
@@ -79,10 +96,13 @@ public class SnapshotTests
 
         playwright?.Dispose();
 
-        if (app != null)
+        foreach (var server in new[] { app, bareApp })
         {
-            await app.StopAsync();
-            await app.DisposeAsync();
+            if (server != null)
+            {
+                await server.StopAsync();
+                await server.DisposeAsync();
+            }
         }
     }
 
@@ -109,6 +129,48 @@ public class SnapshotTests
         var isolated = await page.EvaluateAsync<bool>("() => self.crossOriginIsolated");
 
         await Assert.That(isolated).IsTrue();
+    }
+
+    // Production (GitHub Pages) can't send COOP/COEP, so coi.js has to earn isolation on its own: register a
+    // service worker that re-serves every response with the headers, wait for it to *activate*, then reload
+    // so the worker serves the navigation. Every other test here is handed the headers directly, so coi.js
+    // short-circuits and this path never runs — which is how a runtime boot that raced the worker reached
+    // production while CI stayed green. Serve from the header-less host to exercise it for real.
+    [Test]
+    public async Task ServiceWorkerEstablishesIsolationWhenHostSendsNoHeaders()
+    {
+        var page = await browser!.NewPageAsync();
+
+        var errors = new ConcurrentQueue<string>();
+        page.Console += (_, message) =>
+        {
+            if (message.Type == "error")
+            {
+                errors.Enqueue(message.Text);
+            }
+        };
+        page.PageError += (_, error) => errors.Enqueue(error);
+
+        await page.GotoAsync($"http://localhost:{barePort}/");
+
+        // The boot is gated on isolation, so a rendered upload UI proves the worker handshake completed.
+        // The budget covers the reload that puts the worker's headers on the document.
+        await page.WaitForSelectorAsync(
+            ".file-drop",
+            new()
+            {
+                Timeout = 60000
+            });
+
+        var isolated = await page.EvaluateAsync<bool>("() => self.crossOriginIsolated");
+        await Assert.That(isolated).IsTrue();
+
+        // And nothing tried to boot the threaded runtime on the way there. The first load of a first visit is
+        // necessarily un-isolated — the worker isn't installed yet — so a runtime that starts on it aborts on
+        // the missing SharedArrayBuffer. Recovering via the pending reload is luck, not a design: assert the
+        // boot waited instead.
+        var aborts = string.Join(Environment.NewLine, errors.Where(_ => _.Contains("SharedArrayBuffer")));
+        await Assert.That(aborts).IsEmpty();
     }
 
     // End-to-end on the real threaded runtime: uploading a map runs the read + render off the UI thread
@@ -341,14 +403,33 @@ public class SnapshotTests
         // render; wait for them so the captured HTML/PNG always includes them rather than racing a partial
         // footer. Match on Attached, not the default Visible, since the payload size is display:none at the
         // mobile viewport — it's still in the DOM, which is all we need to know the interop has completed.
-        await page.WaitForSelectorAsync(".footer-size", new() { State = WaitForSelectorState.Attached });
-        await page.WaitForSelectorAsync(".footer-ram", new() { State = WaitForSelectorState.Attached });
+        await page.WaitForSelectorAsync(".footer-size", new() {State = WaitForSelectorState.Attached});
+        await page.WaitForSelectorAsync(".footer-ram", new() {State = WaitForSelectorState.Attached});
     }
 
-    static int GetAvailablePort()
+    // Hold every listener open until all the ports are picked: releasing one before asking for the next
+    // lets the OS hand back the same number twice.
+    static int[] GetAvailablePorts(int count)
     {
-        using var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        return ((IPEndPoint) listener.LocalEndpoint).Port;
+        var listeners = new TcpListener[count];
+        var ports = new int[count];
+        try
+        {
+            for (var index = 0; index < count; index++)
+            {
+                listeners[index] = new(IPAddress.Loopback, 0);
+                listeners[index].Start();
+                ports[index] = ((IPEndPoint) listeners[index].LocalEndpoint).Port;
+            }
+        }
+        finally
+        {
+            foreach (var listener in listeners)
+            {
+                listener.Stop();
+            }
+        }
+
+        return ports;
     }
 }

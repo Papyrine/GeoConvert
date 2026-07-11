@@ -83,6 +83,25 @@ public static class Shapefile
 
     internal static FeatureCollection Read(Stream shp, Stream? dbf, Encoding encoding, ProgressReporter? progress)
     {
+        try
+        {
+            return ReadCore(shp, dbf, encoding, progress);
+        }
+        catch (GeoConvertException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            // A corrupt .shp/.dbf raises assorted BCL exceptions from the span parsers (out-of-range
+            // slices, overflowed counts). This is the one read path that otherwise had no catch-all, so
+            // surface the documented type here, matching WKB/KML/GPX.
+            throw new GeoConvertException($"Invalid shapefile data: {exception.Message}");
+        }
+    }
+
+    static FeatureCollection ReadCore(Stream shp, Stream? dbf, Encoding encoding, ProgressReporter? progress)
+    {
         var geometries = ReadGeometries(shp);
         var collection = new FeatureCollection();
 
@@ -150,14 +169,18 @@ public static class Shapefile
             // Record header is big-endian: record number, then content length in 16-bit words.
             var contentWords = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(position + 4, 4));
             position += 8;
-            var contentBytes = contentWords * 2;
-            if (position + contentBytes > length)
+            // contentWords is signed and straight off the wire. Computing contentWords * 2 as an int
+            // overflows for a hostile length (0x40000000 * 2 wraps negative), which then slips past the
+            // bounds check and throws raw from AsSpan. Widen to long and treat a negative or over-long
+            // record like a truncated one — stop here.
+            var contentBytes = (long)contentWords * 2;
+            if (contentWords < 0 || position + contentBytes > length)
             {
                 break;
             }
 
-            geometries.Add(ParseShape(data.AsSpan(position, contentBytes)));
-            position += contentBytes;
+            geometries.Add(ParseShape(data.AsSpan(position, (int)contentBytes)));
+            position += (int)contentBytes;
         }
 
         return geometries;

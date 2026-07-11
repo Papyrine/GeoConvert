@@ -1,19 +1,4 @@
 
-## 5. Exception contract violations
-
-CLAUDE.md states errors are surfaced as `GeoConvertException`. These leak raw BCL exceptions:
-
-- `Formats/GeoJson.cs:124-138` — `{"type":"Point","coordinates":[1]}` → `InvalidOperationException`
-- `Formats/GeoJson.cs:108` — `{"type":"Point"}` → `KeyNotFoundException`
-- `Formats/TopoJson.cs:230-243`, `:245-253` — same shape
-- `Formats/Shapefile.cs` / `Internal/Dbf.cs` — the only read path with no `GeoConvertException`
-  wrapper at all (see #4)
-- `Formats/Shapefile.cs:151-159` — `contentWords * 2` overflows to negative, the
-  `position + contentBytes > length` guard passes, and `data.AsSpan(position, contentBytes)` throws
-  raw
-
-WKB wraps correctly (verified) — KML/GPX do too. GeoJSON/TopoJSON/Shapefile are the gaps.
-
 ## 6. Polygon fill is O(edges × rows)
 
 `src/GeoConvert/Internal/Canvas.cs:551-570` (`FillScanline`)

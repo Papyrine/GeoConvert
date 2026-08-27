@@ -26,11 +26,8 @@ sealed class ImageSharpSurface(int width, int height, Rgba background) :
         {
             Antialias = true,
         },
-        ShapeOptions = new()
-        {
-            // Even-odd so interior rings (holes) punch through, matching the interface contract.
-            IntersectionRule = IntersectionRule.EvenOdd,
-        },
+        // Even-odd so interior rings (holes) punch through, matching the interface contract.
+        IntersectionRule = IntersectionRule.EvenOdd,
     };
 
     static readonly DrawingOptions antialiased = new()

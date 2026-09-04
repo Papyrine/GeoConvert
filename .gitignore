@@ -35,3 +35,4 @@ Thumbs.db
 
 # Generated at build time from MapBundle.World (see GeoConvert.Web.csproj)
 src/GeoConvert.Web/wwwroot/sample/
+*.lnk

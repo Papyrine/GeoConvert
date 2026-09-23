@@ -1,0 +1,89 @@
+name: build
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      DOTNET_NOLOGO: true
+      DOTNET_CLI_TELEMETRY_OPTOUT: true
+      DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+      # Install the SDK into its own directory rather than over the runner's preinstalled one: the image's
+      # shared library-packs folder carries a Microsoft.NET.Sdk.WebAssembly.Pack that fails signature
+      # validation (NU3034) when restoring GeoConvert.Web.
+      DOTNET_INSTALL_DIR: ${{ github.workspace }}\..\dotnet
+      # SponsorCheck bundles the sponsor list during pack on non-PR builds and needs a classic PAT
+      # (org secret). PR builds skip it.
+      GitHubToken: ${{ secrets.SPONSOR_CHECK_TOKEN }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        # Build the library + CLI in Release (packs GeoConvert + GeoConvert.Cli nupkgs into nugets/)
+        run: dotnet build src --configuration Release
+
+      - name: Install Coverlet
+        # Coverage via Coverlet (managed IL instrumentation). The Microsoft profiler behind MTP's --coverage
+        # instruments nothing on the CI image, producing an empty report; Coverlet works there.
+        shell: pwsh
+        run: dotnet tool install --global coverlet.console --version 10.0.1
+
+      - name: Test with coverage
+        # Run the test suite (TUnit executable) under Coverlet, emitting a trx report and Cobertura coverage.
+        # Coverlet returns non-zero when the wrapped test run fails, so check $LASTEXITCODE to fail the build.
+        # --include "[GeoConvert*]*" instruments only the shipped assemblies (GeoConvert, .Cli, .Skia, .ImageSharp);
+        # without it the report and its console table are dominated by TUnit/Verify/Microsoft.Testing modules that
+        # nothing here gates on.
+        # On CI, ProjectDefaults sets ContinuousIntegrationBuild=true (GitHub Actions), so the SDK's default SourceLink
+        # rewrites embedded-PDB source paths to deterministic forms that don't exist on disk. Coverlet's default
+        # "MissingAll" gate would then drop every shipped module (their local source is "missing"), leaving an empty
+        # report. --exclude-assemblies-without-sources None keeps those modules instrumented; --use-source-link maps
+        # the deterministic paths to raw.githubusercontent URLs (which contain /src/, so coverage-check.ps1 still
+        # scopes them correctly).
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:USERPROFILE\.dotnet\tools;$env:PATH"
+          coverlet src/Tests/bin/Release/net10.0 --target dotnet --targetargs "src/Tests/bin/Release/net10.0/Tests.dll --no-ansi --no-progress --report-trx --report-trx-filename unit.trx --results-directory TestResults" --format cobertura --output TestResults/unit.cobertura.xml --include "[GeoConvert*]*" --exclude-assemblies-without-sources None --use-source-link
+          if ($LASTEXITCODE -ne 0) { throw "Test run / coverage failed (exit code $LASTEXITCODE)." }
+
+      - name: Coverage gate
+        # Fail the build unless the shipped source is fully covered
+        shell: pwsh
+        run: ./src/coverage-check.ps1 -Report TestResults/unit.cobertura.xml -Threshold 100
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: |
+            TestResults/*.trx
+            TestResults/*.cobertura.xml
+          if-no-files-found: ignore
+
+      - name: Upload snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: received
+          path: '**/*.received.*'
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nugets
+          path: nugets/*.nupkg
+          if-no-files-found: error

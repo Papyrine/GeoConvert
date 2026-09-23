@@ -39,7 +39,7 @@ Run from the repo root.
   ignores everything else under `src/` (the test project, the sample web app, the WinForms app), which
   the profiler would otherwise instrument too. The gate is on **lines only**; branch coverage sits in the
   90s and is not enforced. CI runs Coverlet rather than the Microsoft profiler (which instruments nothing
-  on the AppVeyor image) — see `src/appveyor.yml` for the exact invocation. Reproduce it locally with
+  on the CI runner) — see `.github/workflows/build.yml` for the exact invocation. Reproduce it locally with
   `coverlet src/Tests/bin/Debug/net10.0 --target dotnet --targetargs "src/Tests/bin/Debug/net10.0/Tests.dll
   --results-directory TestResults" --format cobertura --output TestResults/unit.cobertura.xml --include
   "[GeoConvert*]*" --exclude-assemblies-without-sources None`. The `--include` filter is what keeps the

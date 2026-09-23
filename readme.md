@@ -1,6 +1,6 @@
 # <img src="/src/icon.png" height="30px"> GeoConvert
 
-[![Build status](https://img.shields.io/appveyor/build/SimonCropp/GeoConvert)](https://ci.appveyor.com/project/SimonCropp/GeoConvert)
+[![Build status](https://github.com/Papyrine/GeoConvert/actions/workflows/build.yml/badge.svg)](https://github.com/Papyrine/GeoConvert/actions/workflows/build.yml)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert)](https://www.nuget.org/packages/GeoConvert/)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.ImageSharp)](https://www.nuget.org/packages/GeoConvert.ImageSharp/)
 [![NuGet Status](https://img.shields.io/nuget/v/GeoConvert.svg?label=GeoConvert.Skia)](https://www.nuget.org/packages/GeoConvert.Skia/)

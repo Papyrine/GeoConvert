@@ -12,7 +12,6 @@
   <Folder Name="/SolutionItems/">
     <File Path="../global.json" />
     <File Path="../readme.md" />
-    <File Path="appveyor.yml" />
     <File Path="coverage-check.ps1" />
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />

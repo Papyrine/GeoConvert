@@ -80,8 +80,8 @@ jobs:
 
       - name: Push to nuget.org
         shell: bash
-        run: >
-          dotnet nuget push "nugets/*.nupkg"
-          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
-          --source https://api.nuget.org/v3/index.json
-          --skip-duplicate
+        # dotnet nuget push does not expand a forward-slash wildcard on Windows, so push each file
+        run: |
+          for package in nugets/*.nupkg; do
+            dotnet nuget push "$package" --api-key ${{ steps.login.outputs.NUGET_API_KEY }} --source https://api.nuget.org/v3/index.json --skip-duplicate
+          done

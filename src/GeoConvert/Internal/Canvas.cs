@@ -649,9 +649,8 @@ sealed class Canvas : IDisposable, IRenderSurface
     // the polygon's pixel x-extent — is cleared and composited.
     void FillScanRow(int y, int activeCount, Rgba color, bool opaque, uint packed, double preR, double preG, double preB, double preA, double inverse, int clearLo, int clearHi)
     {
-        var coverage = coverageBuffer;
         var crossings = scanlineCrossings;
-        coverage.AsSpan(clearLo, clearHi - clearLo + 1).Clear();
+        coverageBuffer.AsSpan(clearLo, clearHi - clearLo + 1).Clear();
 
         foreach (var list in crossings)
         {
@@ -681,11 +680,11 @@ sealed class Canvas : IDisposable, IRenderSurface
             list.Sort();
             for (var i = 0; i + 1 < list.Count; i += 2)
             {
-                AddSpan(coverage, list[i], list[i + 1], weight);
+                AddSpan(coverageBuffer, list[i], list[i + 1], weight);
             }
         }
 
-        CompositeRow(y, coverage, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
+        CompositeRow(y, coverageBuffer, color, opaque, packed, preR, preG, preB, preA, inverse, clearLo, clearHi);
     }
 
     // Adds `weight` of horizontal coverage for the float span [xLeft, xRight) into the row buffer,

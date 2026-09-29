@@ -110,7 +110,7 @@ public class GeoParquetTests
         GeoParquet.Write(buffer, Sample.Mixed());
 
         // A forward-only stream can't seek to the footer, so the reader must buffer it first.
-        using var forwardOnly = new ForwardOnlyStream(buffer.ToArray());
+        await using var forwardOnly = new ForwardOnlyStream(buffer.ToArray());
         var result = GeoParquet.Read(forwardOnly);
 
         await Assert.That(result.Count).IsEqualTo(3);

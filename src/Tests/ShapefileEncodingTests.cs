@@ -101,8 +101,8 @@ public class ShapefileEncodingTests
     {
         using var directory = new TempDirectory();
         var shpPath = WriteOnePointShapefile(directory);
-        using var shp = File.OpenRead(shpPath);
-        using var dbf = File.OpenRead(Path.ChangeExtension(shpPath, ".dbf"));
+        await using var shp = File.OpenRead(shpPath);
+        await using var dbf = File.OpenRead(Path.ChangeExtension(shpPath, ".dbf"));
 
         var read = Shapefile.Read(shp, dbf);
         await Assert.That(read.Features[0].Properties["NAME"]).IsEqualTo("x");

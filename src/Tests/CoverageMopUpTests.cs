@@ -211,7 +211,7 @@ public class CoverageMopUpTests
     public async Task Kmz_empty_archive_throws()
     {
         using var memory = new MemoryStream();
-        using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
+        await using (var archive = new ZipArchive(memory, ZipArchiveMode.Create, leaveOpen: true))
         {
             archive.CreateEntry("readme.txt");
         }
@@ -265,7 +265,7 @@ public class CoverageMopUpTests
         Kmz.Write(stored, features, CompressionLevel.NoCompression);
 
         using var deflated = new MemoryStream();
-        Kmz.Write(deflated, features, CompressionLevel.Optimal);
+        Kmz.Write(deflated, features);
 
         await Assert.That(stored.Length).IsGreaterThan(deflated.Length);
 

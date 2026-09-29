@@ -345,7 +345,10 @@ static class Snippets
         {
             if (layer.Name == "annotations")
             {
-                return new LayerStyle { Label = feature => feature.Properties["text"] as string };
+                return new()
+                {
+                    Label = _ => _.Properties["text"] as string
+                };
             }
 
             return null;

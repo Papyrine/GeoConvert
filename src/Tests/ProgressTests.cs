@@ -259,8 +259,8 @@ public class ProgressTests
         using var directory = new TempDirectory();
         var path = Path.Combine(directory, "d.shp");
         Shapefile.Write(path, Sample.Polygons());
-        using var shp = File.OpenRead(path);
-        using var dbf = File.OpenRead(Path.ChangeExtension(path, ".dbf"));
+        await using var shp = File.OpenRead(path);
+        await using var dbf = File.OpenRead(Path.ChangeExtension(path, ".dbf"));
         await Assert.That(Shapefile.Read(shp, dbf, Encoding.UTF8).Count).IsEqualTo(2);
     }
 

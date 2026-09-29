@@ -5,8 +5,8 @@
 [MemoryDiagnoser]
 public class RenderPhaseBenchmarks
 {
-    const int Width = 1024;
-    const int Height = 768;
+    const int width = 1024;
+    const int height = 768;
 
     FeatureCollection data = null!;
     RenderOptions optimal = null!;
@@ -20,9 +20,33 @@ public class RenderPhaseBenchmarks
     public void Setup()
     {
         data = SampleData.Polygons(500);
-        optimal = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.Optimal } };
-        fastest = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.Fastest } };
-        noCompression = new() { Width = Width, Height = Height, Png = new() { Compression = CompressionLevel.NoCompression } };
+        optimal = new()
+        {
+            Width = width,
+            Height = height,
+            Png = new()
+            {
+                Compression = CompressionLevel.Optimal
+            }
+        };
+        fastest = new()
+        {
+            Width = width,
+            Height = height,
+            Png = new()
+            {
+                Compression = CompressionLevel.Fastest
+            }
+        };
+        noCompression = new()
+        {
+            Width = width,
+            Height = height,
+            Png = new()
+            {
+                Compression = CompressionLevel.NoCompression
+            }
+        };
 
         // Pre-rasterise once by reaching into the renderer's private Projection + DrawLayer so we
         // can grab the raw Canvas.Pixels buffer. Used by the EncodeOnly_* benchmarks to time the
@@ -32,7 +56,7 @@ public class RenderPhaseBenchmarks
         var pngType = assembly.GetType("Png", throwOnError: true)!;
 
         var canvasCtor = canvasType.GetConstructor([typeof(int), typeof(int), typeof(Rgba)])!;
-        var canvas = canvasCtor.Invoke([Width, Height, new Rgba(255, 255, 255, 255)]);
+        var canvas = canvasCtor.Invoke([width, height, new Rgba(255, 255, 255)]);
         var pixelsProp = canvasType.GetProperty("Pixels")!;
 
         var projectionType = typeof(MapRenderer).GetNestedType("Projection", BindingFlags.NonPublic)!;
@@ -74,7 +98,7 @@ public class RenderPhaseBenchmarks
     public long EncodeOnly_Optimal()
     {
         using var memory = new MemoryStream();
-        pngWrite(memory, pixels, Width, Height, CompressionLevel.Optimal);
+        pngWrite(memory, pixels, width, height, CompressionLevel.Optimal);
         return memory.Length;
     }
 
@@ -82,7 +106,7 @@ public class RenderPhaseBenchmarks
     public long EncodeOnly_NoCompression()
     {
         using var memory = new MemoryStream();
-        pngWrite(memory, pixels, Width, Height, CompressionLevel.NoCompression);
+        pngWrite(memory, pixels, width, height, CompressionLevel.NoCompression);
         return memory.Length;
     }
 }
@@ -113,20 +137,3 @@ public class RenderBigPolygonBenchmarks
 // Stroke-heavy fixture: many long zig-zag polylines with no polygon fills, so StrokeLine
 // dominates the rasterizer time. Used to measure the FillDisc/StrokeLine SIMD change cleanly —
 // the polygon-heavy RenderPhaseBenchmarks swamps stroke work under translucent-fill blend.
-[MemoryDiagnoser]
-public class RenderLineBenchmarks
-{
-    FeatureCollection data = null!;
-    RenderOptions options = null!;
-
-    [GlobalSetup]
-    public void Setup()
-    {
-        data = SampleData.LongLines(50);
-        options = new() { Width = 1024, Height = 768, Png = new() { Compression = CompressionLevel.NoCompression } };
-    }
-
-    [Benchmark]
-    public int Full_NoCompression() =>
-        MapRenderer.RenderPng(data, options).Length;
-}

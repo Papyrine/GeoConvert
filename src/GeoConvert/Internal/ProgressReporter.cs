@@ -9,10 +9,10 @@ namespace GeoConvert;
 /// </summary>
 sealed class ProgressReporter
 {
-    readonly IProgress<ConvertProgress> sink;
-    readonly ProgressPhase phase;
-    readonly long? featureTotal;
-    readonly long? byteTotal;
+    IProgress<ConvertProgress> sink;
+    ProgressPhase phase;
+    long? featureTotal;
+    long? byteTotal;
     long features;
     long bytes;
 

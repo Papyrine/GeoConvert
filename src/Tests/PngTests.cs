@@ -1635,7 +1635,7 @@ public class PngTests
             {
                 if (layer.Name == "child")
                 {
-                    return new LayerStyle
+                    return new()
                     {
                         MinFeaturePixels = 4
                     };

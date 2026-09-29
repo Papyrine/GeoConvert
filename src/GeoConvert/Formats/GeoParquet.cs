@@ -412,7 +412,15 @@ public static class GeoParquet
                 geometryColumnName,
                 ParquetMetadata.TypeByteArray,
                 features,
-                feature => feature.Geometry is { } geometry ? Wkb.ToBytes(geometry) : null,
+                feature =>
+                {
+                    if (feature.Geometry is { } geometry)
+                    {
+                        return Wkb.ToBytes(geometry);
+                    }
+
+                    return null;
+                },
                 codec,
                 gzipLevel,
                 progress));
@@ -463,7 +471,12 @@ public static class GeoParquet
                 return null;
             }
 
-            return type == ParquetMetadata.TypeByteArray ? Encoding.UTF8.GetBytes(Scalars.Format(value)) : value;
+            if (type == ParquetMetadata.TypeByteArray)
+            {
+                return Encoding.UTF8.GetBytes(Scalars.Format(value));
+            }
+
+            return value;
         };
 
     static ParquetMetadata.Column WriteColumn(
@@ -702,6 +715,11 @@ public static class GeoParquet
     {
         var numeric = a is ParquetMetadata.TypeInt64 or ParquetMetadata.TypeDouble &&
                       b is ParquetMetadata.TypeInt64 or ParquetMetadata.TypeDouble;
-        return numeric ? ParquetMetadata.TypeDouble : ParquetMetadata.TypeByteArray;
+        if (numeric)
+        {
+            return ParquetMetadata.TypeDouble;
+        }
+
+        return ParquetMetadata.TypeByteArray;
     }
 }

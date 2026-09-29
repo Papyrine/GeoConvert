@@ -45,8 +45,15 @@ public static class ConversionService
         AllFormats.FirstOrDefault(_ => _.Format == format);
 
     /// <summary>Infers the format of a file name, or null when the extension is unknown.</summary>
-    public static FormatInfo? Detect(string fileName) =>
-        GeoConverter.TryDetectFormat(fileName, out var format) ? Find(format) : null;
+    public static FormatInfo? Detect(string fileName)
+    {
+        if (GeoConverter.TryDetectFormat(fileName, out var format))
+        {
+            return Find(format);
+        }
+
+        return null;
+    }
 
     public static FeatureCollection Read(string path, GeoFormat format, IProgress<ConvertProgress>? progress = null) =>
         // GeoConverter.Read is path-based and already special-cases Shapefile's sibling .shp/.shx/.dbf.
@@ -199,9 +206,14 @@ public static class ConversionService
             {
                 var key = settings.LabelProperty;
                 options.Label = _ =>
-                    _.Properties.TryGetValue(key, out var value) && value is not null
-                        ? value.ToString()
-                        : null;
+                {
+                    if (_.Properties.TryGetValue(key, out var value) && value is not null)
+                    {
+                        return value.ToString();
+                    }
+
+                    return null;
+                };
             }
         }
 

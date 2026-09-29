@@ -580,8 +580,15 @@ public static class FlatGeobuf
         };
 
     // Called only with differing types: mixed integer/double collapses to double, anything else to string.
-    static byte Widen(byte a, byte b) =>
-        a is columnLong or columnDouble && b is columnLong or columnDouble ? columnDouble : columnString;
+    static byte Widen(byte a, byte b)
+    {
+        if (a is columnLong or columnDouble && b is columnLong or columnDouble)
+        {
+            return columnDouble;
+        }
+
+        return columnString;
+    }
 
     static byte CommonGeometryType(FeatureCollection collection)
     {

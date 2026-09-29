@@ -8,7 +8,18 @@ public sealed class Polygon(IReadOnlyList<IReadOnlyList<Position>> rings) : Geom
 {
     public IReadOnlyList<IReadOnlyList<Position>> Rings { get; } = rings;
 
-    public IReadOnlyList<Position>? ExteriorRing => Rings.Count > 0 ? Rings[0] : null;
+    public IReadOnlyList<Position>? ExteriorRing
+    {
+        get
+        {
+            if (Rings.Count > 0)
+            {
+                return Rings[0];
+            }
+
+            return null;
+        }
+    }
 
     public IEnumerable<IReadOnlyList<Position>> InteriorRings => Rings.Skip(1);
 

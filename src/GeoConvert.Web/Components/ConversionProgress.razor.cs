@@ -42,7 +42,12 @@ public partial class ConversionProgress
                 : Humanize(report.Bytes));
         }
 
-        return parts.Count == 0 ? null : string.Join(" · ", parts);
+        if (parts.Count == 0)
+        {
+            return null;
+        }
+
+        return string.Join(" · ", parts);
     }
 
     static string Humanize(long bytes)
@@ -58,8 +63,11 @@ public partial class ConversionProgress
 
         // Invariant so the decimal point is always "." (the app runs under InvariantGlobalization, but
         // pin it here so the formatting is identical regardless of host culture).
-        return unit == 0
-            ? $"{bytes} B"
-            : $"{size.ToString("0.0", CultureInfo.InvariantCulture)} {units[unit]}";
+        if (unit == 0)
+        {
+            return $"{bytes} B";
+        }
+
+        return $"{size.ToString("0.0", CultureInfo.InvariantCulture)} {units[unit]}";
     }
 }

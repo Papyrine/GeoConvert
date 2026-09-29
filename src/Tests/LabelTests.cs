@@ -892,7 +892,15 @@ public class LabelTests
         options.Label = _ => null;
         options.LayerStyle = _ => new()
         {
-            Label = _ => _.Properties.TryGetValue("code", out var v) ? v as string : null,
+            Label = _ =>
+            {
+                if (_.Properties.TryGetValue("code", out var v))
+                {
+                    return v as string;
+                }
+
+                return null;
+            },
         };
         var pixels = Render(features, options);
         await Assert.That(LabelPixels(pixels)).IsGreaterThan(0);
@@ -997,7 +1005,15 @@ public class LabelTests
             Width = 200,
             Projection = MapProjection.PlateCarree,
             Padding = 0,
-            Label = feature => feature.Properties.TryGetValue("name", out var v) ? v as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var v))
+                {
+                    return v as string;
+                }
+
+                return null;
+            },
             LabelSize = 20,
             LabelColor = Rgba.Black,
             LabelHalo = null,
@@ -1096,7 +1112,15 @@ public class LabelTests
             Bounds = new(-180, -80, 180, 80),
             Width = 1200,
             Projection = MapProjection.PlateCarree,
-            Label = feature => feature.Properties.TryGetValue("name", out var v) ? v as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var v))
+                {
+                    return v as string;
+                }
+
+                return null;
+            },
             LabelSize = 18,
             LabelColor = new(30, 30, 30),
             LabelHalo = new(255, 255, 255, 220),
@@ -1125,7 +1149,15 @@ public class LabelTests
                 Fill = new(220, 220, 210),
                 Stroke = new(120, 120, 120),
                 StrokeWidth = 1,
-                Label = _ => _.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+                Label = _ =>
+                {
+                    if (_.Properties.TryGetValue("NAME", out var value))
+                    {
+                        return value as string;
+                    }
+
+                    return null;
+                },
                 LabelSize = 14,
                 LabelColor = new(30, 30, 30),
                 LabelHalo = new(255, 255, 255, 220),
@@ -1152,7 +1184,15 @@ public class LabelTests
                 Fill = new(220, 220, 210),
                 Stroke = new(120, 120, 120),
                 StrokeWidth = 1,
-                Label = _ => _.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+                Label = _ =>
+                {
+                    if (_.Properties.TryGetValue("NAME", out var value))
+                    {
+                        return value as string;
+                    }
+
+                    return null;
+                },
                 LabelSize = 14,
                 LabelColor = new(30, 30, 30),
                 LabelHalo = null,
@@ -1179,7 +1219,15 @@ public class LabelTests
             Bounds = new(-180, -10, 180, 80),
             Width = 600,
             Projection = MapProjection.PlateCarree,
-            Label = feature => feature.Properties.TryGetValue("name", out var v) ? v as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var v))
+                {
+                    return v as string;
+                }
+
+                return null;
+            },
             LabelSize = 14,
             LabelColor = new(40, 40, 40),
             LabelHalo = new(255, 255, 255, 220),
@@ -1212,7 +1260,15 @@ public class LabelTests
             }),
         };
         var options = LabelOptions();
-        options.LabelPriority = _ => _.Properties.TryGetValue("rank", out var v) ? Convert.ToDouble(v) : 0;
+        options.LabelPriority = _ =>
+        {
+            if (_.Properties.TryGetValue("rank", out var v))
+            {
+                return Convert.ToDouble(v);
+            }
+
+            return 0;
+        };
 
         var png = MapRenderer.RenderPng(features, options);
         var pixels = Decode(png);
@@ -1253,9 +1309,14 @@ public class LabelTests
 
         var options = LabelOptions();
         options.LabelPriority = feature =>
-            feature.Properties.TryGetValue("name", out var n) && n is string name && importance.TryGetValue(name, out var p)
-                ? p
-                : 0;
+        {
+            if (feature.Properties.TryGetValue("name", out var n) && n is string name && importance.TryGetValue(name, out var p))
+            {
+                return p;
+            }
+
+            return 0;
+        };
         var png = MapRenderer.RenderPng(features, options);
         var pixels = Decode(png);
         await Assert.That(LabelPixels(pixels)).IsGreaterThan(0);
@@ -1535,7 +1596,15 @@ public class LabelTests
             Width = 400,
             Projection = MapProjection.PlateCarree,
             Padding = 0,
-            Label = feature => feature.Properties.TryGetValue("name", out var v) ? v as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var v))
+                {
+                    return v as string;
+                }
+
+                return null;
+            },
             LabelSize = 14,
             LabelColor = new(20, 20, 20),
             LabelHalo = null,

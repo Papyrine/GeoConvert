@@ -295,7 +295,12 @@ static class LineSimplifier
         public int Compare((double Area, Position Vertex) x, (double Area, Position Vertex) y)
         {
             var byArea = x.Area.CompareTo(y.Area);
-            return byArea != 0 ? byArea : ComparePositions(x.Vertex, y.Vertex);
+            if (byArea != 0)
+            {
+                return byArea;
+            }
+
+            return ComparePositions(x.Vertex, y.Vertex);
         }
     }
 }

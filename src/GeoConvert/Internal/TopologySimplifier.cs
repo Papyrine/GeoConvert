@@ -178,10 +178,15 @@ static class TopologySimplifier
     // vertex (first == last by polygon invariant), which would otherwise show up as a phantom
     // (prev, next) sample at i=last. Open or malformed rings (no closure) fall back to the raw
     // count, which is correct for them.
-    static int RingCycleLength(IReadOnlyList<Position> ring) =>
-        ring.Count > 0 && ring[0].Equals(ring[^1])
-            ? ring.Count - 1
-            : ring.Count;
+    static int RingCycleLength(IReadOnlyList<Position> ring)
+    {
+        if (ring.Count > 0 && ring[0].Equals(ring[^1]))
+        {
+            return ring.Count - 1;
+        }
+
+        return ring.Count;
+    }
 
     static void Observe(
         HashSet<Position> junctions,

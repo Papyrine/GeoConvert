@@ -209,9 +209,12 @@ public static class Shapefile
             case 3 or 13 or 23: // PolyLine
             {
                 var rings = ReadParts(content);
-                return rings.Count == 1
-                    ? new LineString(rings[0])
-                    : new MultiLineString([.. rings.Select(_ => new LineString(_))]);
+                if (rings.Count == 1)
+                {
+                    return new LineString(rings[0]);
+                }
+
+                return new MultiLineString([.. rings.Select(_ => new LineString(_))]);
             }
             case 5 or 15 or 25: // Polygon
                 return BuildPolygons(ReadParts(content));
@@ -278,9 +281,12 @@ public static class Shapefile
             }
         }
 
-        return polygons.Count == 1
-            ? new Polygon(polygons[0])
-            : new MultiPolygon([.. polygons.Select(_ => new Polygon(_))]);
+        if (polygons.Count == 1)
+        {
+            return new Polygon(polygons[0]);
+        }
+
+        return new MultiPolygon([.. polygons.Select(_ => new Polygon(_))]);
     }
 
     static bool BboxContains(IReadOnlyList<Position> outer, IReadOnlyList<Position> inner)
@@ -494,10 +500,15 @@ public static class Shapefile
 
     // The shape type is established by DetermineShapeType before these are called, so the geometry is
     // known to be a polyline (line/multi-line) or polygon respectively.
-    static IReadOnlyList<IReadOnlyList<Position>> LineParts(Geometry geometry) =>
-        geometry is MultiLineString multi
-            ? [.. multi.LineStrings.Select(_ => _.Positions)]
-            : [((LineString)geometry).Positions];
+    static IReadOnlyList<IReadOnlyList<Position>> LineParts(Geometry geometry)
+    {
+        if (geometry is MultiLineString multi)
+        {
+            return [.. multi.LineStrings.Select(_ => _.Positions)];
+        }
+
+        return [((LineString)geometry).Positions];
+    }
 
     static IReadOnlyList<IReadOnlyList<Position>> PolygonParts(Geometry geometry)
     {

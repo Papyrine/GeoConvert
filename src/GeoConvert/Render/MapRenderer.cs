@@ -599,7 +599,12 @@ public static class MapRenderer
         switch (geometry)
         {
             case Polygon polygon:
-                return polygon.Rings.Count == 0 ? 0 : Math.Abs(Ring.SignedArea(polygon.Rings[0]));
+                if (polygon.Rings.Count == 0)
+                {
+                    return 0;
+                }
+
+                return Math.Abs(Ring.SignedArea(polygon.Rings[0]));
             case MultiPolygon multiPolygon:
                 var total = 0d;
                 foreach (var p in multiPolygon.Polygons)
@@ -820,7 +825,12 @@ public static class MapRenderer
             }
         }
 
-        return longest == null ? null : LineAnchor(longest.Positions, projection);
+        if (longest == null)
+        {
+            return null;
+        }
+
+        return LineAnchor(longest.Positions, projection);
     }
 
     static (double X, double Y)? PolygonAnchor(IReadOnlyList<Position> ring, Projection projection)

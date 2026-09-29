@@ -352,9 +352,14 @@ public static class Runner
                     // that don't carry the key or whose value is explicitly null.
                     var key = labelProperty;
                     renderOptions.Label = feature =>
-                        feature.Properties.TryGetValue(key, out var value) && value != null
-                            ? value.ToString()
-                            : null;
+                    {
+                        if (feature.Properties.TryGetValue(key, out var value) && value != null)
+                        {
+                            return value.ToString();
+                        }
+
+                        return null;
+                    };
                 }
 
                 if (labelSize.HasValue)

@@ -122,9 +122,12 @@ public static class TopoJson
             {
                 var coordinates = element.GetProperty("coordinates");
                 // An empty coordinates array round-trips to an empty Point (matches GeoJson behavior).
-                return coordinates.GetArrayLength() == 0
-                    ? new Point(new(double.NaN, double.NaN))
-                    : new Point(DecodePoint(coordinates, scale, translate));
+                if (coordinates.GetArrayLength() == 0)
+                {
+                    return new Point(new(double.NaN, double.NaN));
+                }
+
+                return new Point(DecodePoint(coordinates, scale, translate));
             }
             case "MultiPoint":
                 return new MultiPoint(DecodePoints(element.GetProperty("coordinates"), scale, translate));

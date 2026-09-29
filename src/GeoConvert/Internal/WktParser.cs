@@ -281,7 +281,12 @@ sealed class WktParser(string text)
     char Peek()
     {
         SkipWhitespace();
-        return pos < text.Length ? text[pos] : '\0';
+        if (pos < text.Length)
+        {
+            return text[pos];
+        }
+
+        return '\0';
     }
 
     void Expect(char expected)

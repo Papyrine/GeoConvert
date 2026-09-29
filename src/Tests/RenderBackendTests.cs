@@ -146,7 +146,15 @@ public class RenderBackendTests
         {
             Width = 256,
             Height = 256,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
         });
 
         var (width, height, nonBackground) = Inspect(png);
@@ -234,7 +242,15 @@ public class RenderBackendTests
             Width = 300,
             Height = 220,
             Projection = MapProjection.PlateCarree,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
         });
 
         return Verify(png, "png");

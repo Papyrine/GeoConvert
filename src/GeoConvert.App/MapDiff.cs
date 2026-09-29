@@ -26,10 +26,15 @@ public static class MapDiff
         RenderSettings settings,
         DiffMode mode,
         Rgba colorA,
-        Rgba colorB) =>
-        mode == DiffMode.SideBySide
-            ? RenderSideBySide(a, b, settings, colorA, colorB)
-            : RenderOverlay(a, b, settings, colorA, colorB);
+        Rgba colorB)
+    {
+        if (mode == DiffMode.SideBySide)
+        {
+            return RenderSideBySide(a, b, settings, colorA, colorB);
+        }
+
+        return RenderOverlay(a, b, settings, colorA, colorB);
+    }
 
     static byte[] RenderOverlay(FeatureCollection a, FeatureCollection b, RenderSettings settings, Rgba colorA, Rgba colorB)
     {
@@ -177,27 +182,51 @@ public static class MapDiff
         builder.AppendLine(CultureInfo.InvariantCulture, $"  Properties only in B: {(onlyInB.Count == 0 ? "(none)" : string.Join(", ", onlyInB))}");
     }
 
-    static string FormatDelta(int value) =>
-        value > 0 ? $"+{value}" : value.ToString(CultureInfo.InvariantCulture);
+    static string FormatDelta(int value)
+    {
+        if (value > 0)
+        {
+            return $"+{value}";
+        }
 
-    static string FormatBounds(Envelope bounds) =>
-        bounds.IsEmpty
-            ? "(empty)"
-            : string.Format(
-                CultureInfo.InvariantCulture,
-                "{0:0.###}, {1:0.###} .. {2:0.###}, {3:0.###}",
-                bounds.MinX,
-                bounds.MinY,
-                bounds.MaxX,
-                bounds.MaxY);
+        return value.ToString(CultureInfo.InvariantCulture);
+    }
 
-    static string FormatKinds(IReadOnlyDictionary<string, int> kinds) =>
-        kinds.Count == 0
-            ? "(none)"
-            : string.Join(", ", kinds.OrderByDescending(_ => _.Value).Select(_ => $"{_.Key} {_.Value}"));
+    static string FormatBounds(Envelope bounds)
+    {
+        if (bounds.IsEmpty)
+        {
+            return "(empty)";
+        }
 
-    static string FormatKeys(IReadOnlyCollection<string> keys) =>
-        keys.Count == 0 ? "(none)" : string.Join(", ", keys);
+        return string.Format(
+            CultureInfo.InvariantCulture,
+            "{0:0.###}, {1:0.###} .. {2:0.###}, {3:0.###}",
+            bounds.MinX,
+            bounds.MinY,
+            bounds.MaxX,
+            bounds.MaxY);
+    }
+
+    static string FormatKinds(IReadOnlyDictionary<string, int> kinds)
+    {
+        if (kinds.Count == 0)
+        {
+            return "(none)";
+        }
+
+        return string.Join(", ", kinds.OrderByDescending(_ => _.Value).Select(_ => $"{_.Key} {_.Value}"));
+    }
+
+    static string FormatKeys(IReadOnlyCollection<string> keys)
+    {
+        if (keys.Count == 0)
+        {
+            return "(none)";
+        }
+
+        return string.Join(", ", keys);
+    }
 
     sealed record MapStats(
         int FeatureCount,

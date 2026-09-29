@@ -232,16 +232,28 @@ public class PngTests
                 Fill = new(232, 224, 206),
                 Stroke = new(120, 100, 70),
                 // Only the city points carry labels; the border polygon has no name to render.
-                Label = feature => feature.Geometry is Point && feature.Properties.TryGetValue("name", out var value)
-                    ? value as string
-                    : null,
-                // Dark dots for the cities; the border keeps the default brown outline above.
-                LayerStyle = layer => ReferenceEquals(layer, cities)
-                    ? new()
+                Label = feature =>
+                {
+                    if (feature.Geometry is Point && feature.Properties.TryGetValue("name", out var value))
                     {
-                        Stroke = new(60, 60, 60)
+                        return value as string;
                     }
-                    : null,
+
+                    return null;
+                },
+                // Dark dots for the cities; the border keeps the default brown outline above.
+                LayerStyle = layer =>
+                {
+                    if (ReferenceEquals(layer, cities))
+                    {
+                        return new()
+                        {
+                            Stroke = new(60, 60, 60)
+                        };
+                    }
+
+                    return null;
+                },
             });
 
         return Verify(png, "png");
@@ -1402,7 +1414,12 @@ public class PngTests
             count++;
         }
 
-        return count == 0 ? -1 : sum / count;
+        if (count == 0)
+        {
+            return -1;
+        }
+
+        return sum / count;
     }
 
     // A small decoder for GeoConvert's own PNG output (8-bit RGBA, filter 0 rows).
@@ -1614,12 +1631,18 @@ public class PngTests
             Bounds = new Envelope(-25, -25, 25, 25),
             Width = 1024,
             Height = 1024,
-            LayerStyle = layer => layer.Name == "child"
-                ? new LayerStyle
+            LayerStyle = layer =>
+            {
+                if (layer.Name == "child")
                 {
-                    MinFeaturePixels = 4
+                    return new LayerStyle
+                    {
+                        MinFeaturePixels = 4
+                    };
                 }
-                : null,
+
+                return null;
+            },
         };
 
         // Hard to assert "child filtered AND root not" by pixel count alone (both polygons paint

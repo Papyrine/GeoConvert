@@ -165,7 +165,15 @@ public class SvgTests
             Bounds = new Envelope(0, 0, 10, 10),
             Width = 256,
             Height = 256,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
         });
 
         await Assert.That(svg).Contains("<text ");
@@ -187,7 +195,15 @@ public class SvgTests
             Bounds = new Envelope(0, 0, 10, 10),
             Width = 256,
             Height = 256,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
             LabelHalo = null,
         });
 
@@ -208,7 +224,15 @@ public class SvgTests
             Bounds = new Envelope(0, 0, 10, 10),
             Width = 256,
             Height = 256,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
             LabelKnockout = new(255, 255, 255),
         });
 
@@ -230,7 +254,15 @@ public class SvgTests
             Bounds = new Envelope(0, 0, 10, 10),
             Width = 256,
             Height = 256,
-            Label = feature => feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            Label = feature =>
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
         });
 
         await Assert.That(svg).Contains("A &amp; B &lt;C&gt;");
@@ -283,9 +315,15 @@ public class SvgTests
             Width = 64,
             Height = 64,
             Projection = MapProjection.PlateCarree,
-            LayerStyle = layer => layer.Name == "upper"
-                ? new() { Fill = new(220, 30, 30) }
-                : new() { Fill = new(20, 200, 20) },
+            LayerStyle = layer =>
+            {
+                if (layer.Name == "upper")
+                {
+                    return new() { Fill = new(220, 30, 30) };
+                }
+
+                return new() { Fill = new(20, 200, 20) };
+            },
         });
 
         var lowerIndex = svg.IndexOf("#14c814", StringComparison.Ordinal);

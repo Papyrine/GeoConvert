@@ -323,7 +323,14 @@ static class Snippets
         var options = new RenderOptions
         {
             Label = feature =>
-                feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+            {
+                if (feature.Properties.TryGetValue("name", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
             LabelSize = 18,
             LabelColor = new(20, 20, 20),
             LabelHalo = new(255, 255, 255, 220),
@@ -334,9 +341,15 @@ static class Snippets
         // Per-layer override: a child layer can carry its own label callback (or scale/color/halo)
         // independent of the options-wide default. Setting Label = _ => null on a LayerStyle
         // suppresses labelling for that layer.
-        options.LayerStyle = layer => layer.Name == "annotations"
-            ? new LayerStyle { Label = feature => feature.Properties["text"] as string }
-            : null;
+        options.LayerStyle = layer =>
+        {
+            if (layer.Name == "annotations")
+            {
+                return new LayerStyle { Label = feature => feature.Properties["text"] as string };
+            }
+
+            return null;
+        };
 
         // By default, labels are placed largest-feature-first so when two collide the bigger
         // polygon's name wins. Override LabelPriority to drive collision order from anything
@@ -344,7 +357,14 @@ static class Snippets
         // closure. Without this, Natural Earth's "Ireland" would beat "United Kingdom" on file
         // order; with population priority, UK (67M) outranks Ireland (5M) and gets the spot.
         options.LabelPriority = feature =>
-            feature.Properties.TryGetValue("POP_EST", out var p) ? Convert.ToDouble(p) : 0;
+        {
+            if (feature.Properties.TryGetValue("POP_EST", out var p))
+            {
+                return Convert.ToDouble(p);
+            }
+
+            return 0;
+        };
 
         // Or look priorities up in a separate table — useful when the data and the importance
         // ranking live in different files.
@@ -389,7 +409,14 @@ static class Snippets
             Stroke = new(120, 120, 120),
             StrokeWidth = 1,
             Label = feature =>
-                feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+            {
+                if (feature.Properties.TryGetValue("NAME", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
             LabelSize = 14,
             LabelColor = new(30, 30, 30),
             LabelHalo = new(255, 255, 255, 220),
@@ -420,7 +447,14 @@ static class Snippets
             Stroke = new(120, 120, 120),
             StrokeWidth = 1,
             Label = feature =>
-                feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+            {
+                if (feature.Properties.TryGetValue("NAME", out var value))
+                {
+                    return value as string;
+                }
+
+                return null;
+            },
             LabelSize = 14,
             LabelColor = new(30, 30, 30),
             LabelHalo = null,

@@ -35,18 +35,24 @@ public static class Wkb
         {
             var slice = data.Slice(position, 4);
             position += 4;
-            return little
-                ? BinaryPrimitives.ReadUInt32LittleEndian(slice)
-                : BinaryPrimitives.ReadUInt32BigEndian(slice);
+            if (little)
+            {
+                return BinaryPrimitives.ReadUInt32LittleEndian(slice);
+            }
+
+            return BinaryPrimitives.ReadUInt32BigEndian(slice);
         }
 
         public double ReadDouble(bool little)
         {
             var slice = data.Slice(position, 8);
             position += 8;
-            return little
-                ? BinaryPrimitives.ReadDoubleLittleEndian(slice)
-                : BinaryPrimitives.ReadDoubleBigEndian(slice);
+            if (little)
+            {
+                return BinaryPrimitives.ReadDoubleLittleEndian(slice);
+            }
+
+            return BinaryPrimitives.ReadDoubleBigEndian(slice);
         }
     }
 

@@ -484,7 +484,12 @@ static class GoodeLobes
     static bool Inside(Position position, Axis axis, double threshold, bool keepGreater)
     {
         var value = axis == Axis.Longitude ? position.X : position.Y;
-        return keepGreater ? value >= threshold : value <= threshold;
+        if (keepGreater)
+        {
+            return value >= threshold;
+        }
+
+        return value <= threshold;
     }
 
     static Position Intersect(Position a, Position b, Axis axis, double threshold)

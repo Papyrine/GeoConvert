@@ -21,8 +21,11 @@ public sealed class SimplifySettings
             return collection;
         }
 
-        return Topology
-            ? Simplifier.SimplifyTopology(collection, Tolerance, Method)
-            : Simplifier.Simplify(collection, Tolerance, Method);
+        if (Topology)
+        {
+            return Simplifier.SimplifyTopology(collection, Tolerance, Method);
+        }
+
+        return Simplifier.Simplify(collection, Tolerance, Method);
     }
 }

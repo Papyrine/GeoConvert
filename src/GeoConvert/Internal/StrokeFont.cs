@@ -179,8 +179,15 @@ static class StrokeFont
         CharUnicodeInfo.GetUnicodeCategory(character) ==
         UnicodeCategory.NonSpacingMark;
 
-    static Glyph GlyphFor(char character) =>
-        glyphs.TryGetValue(character, out var g) ? g : glyphs['?'];
+    static Glyph GlyphFor(char character)
+    {
+        if (glyphs.TryGetValue(character, out var g))
+        {
+            return g;
+        }
+
+        return glyphs['?'];
+    }
 
     // Compact stroke-list builder so the glyph table reads as one line per character.
     static Glyph G(double width, params (double X, double Y)[][] strokes) =>

@@ -15,9 +15,31 @@ public readonly record struct Envelope(double MinX, double MinY, double MaxX, do
         !double.IsFinite(MaxX) ||
         !double.IsFinite(MaxY);
 
-    public double Width => IsEmpty ? 0 : MaxX - MinX;
+    public double Width
+    {
+        get
+        {
+            if (IsEmpty)
+            {
+                return 0;
+            }
 
-    public double Height => IsEmpty ? 0 : MaxY - MinY;
+            return MaxX - MinX;
+        }
+    }
+
+    public double Height
+    {
+        get
+        {
+            if (IsEmpty)
+            {
+                return 0;
+            }
+
+            return MaxY - MinY;
+        }
+    }
 
     public Envelope ExpandToInclude(Position position) =>
         ExpandToInclude(position.X, position.Y);

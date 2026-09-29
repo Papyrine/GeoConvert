@@ -12,8 +12,15 @@ public sealed class Point(Position coordinate) : Geometry
 
     public override bool HasM => Coordinate.HasM;
 
-    public override Envelope GetBounds() =>
-        IsEmpty ? Envelope.Empty : new(Coordinate.X, Coordinate.Y, Coordinate.X, Coordinate.Y);
+    public override Envelope GetBounds()
+    {
+        if (IsEmpty)
+        {
+            return Envelope.Empty;
+        }
+
+        return new(Coordinate.X, Coordinate.Y, Coordinate.X, Coordinate.Y);
+    }
 
     public Point(double x, double y)
         : this(new(x, y))

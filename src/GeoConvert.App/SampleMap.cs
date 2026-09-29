@@ -12,6 +12,11 @@ static class SampleMap
     public static string? Locate()
     {
         var path = Path.Combine(AppContext.BaseDirectory, "maps", "World", "borders.fgb");
-        return File.Exists(path) ? path : null;
+        if (File.Exists(path))
+        {
+            return path;
+        }
+
+        return null;
     }
 }

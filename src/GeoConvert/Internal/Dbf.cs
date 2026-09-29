@@ -169,7 +169,12 @@ static class Dbf
 
                 return null;
             default:
-                return trimmed.Length == 0 ? null : trimmed;
+                if (trimmed.Length == 0)
+                {
+                    return null;
+                }
+
+                return trimmed;
         }
     }
 

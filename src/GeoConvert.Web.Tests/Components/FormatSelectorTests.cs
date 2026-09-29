@@ -33,9 +33,9 @@ public class FormatSelectorTests : BunitTestContext
             .Add(_ => _.Label, "Convert to")
             .Add(_ => _.Formats, ConversionService.WritableFormats)
             .Add(_ => _.Selected, GeoFormat.Kml)
-            .Add(_ => _.SelectedChanged, (GeoFormat format) => selected = format));
+            .Add(_ => _.SelectedChanged, format => selected = format));
 
-        await EventHandlerDispatchExtensions.ChangeAsync(cut.Find("select"), nameof(GeoFormat.Gpx));
+        await cut.Find("select").ChangeAsync(nameof(GeoFormat.Gpx));
 
         await Assert.That(selected).IsEqualTo(GeoFormat.Gpx);
     }

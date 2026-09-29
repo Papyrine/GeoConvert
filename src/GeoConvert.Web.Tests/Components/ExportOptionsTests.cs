@@ -129,7 +129,7 @@ public class ExportOptionsTests : BunitTestContext
             .Add(component => component.Target, GeoFormat.Png)
             .Add(component => component.OnRenderChanged, () => raised = true));
 
-        await EventHandlerDispatchExtensions.ChangeAsync(cut.Find("#projection-select"), nameof(MapProjection.PlateCarree));
+        await cut.Find("#projection-select").ChangeAsync(nameof(MapProjection.PlateCarree));
 
         await Assert.That(raised).IsTrue();
     }
@@ -144,7 +144,7 @@ public class ExportOptionsTests : BunitTestContext
         // Snappy (the default) ignores the deflate level, so the GZIP-level control is hidden.
         await Assert.That(cut.FindAll("#parquet-gzip").Count).IsEqualTo(0);
 
-        await EventHandlerDispatchExtensions.ChangeAsync(cut.Find("#parquet-codec"), nameof(ParquetCompression.Gzip));
+        await cut.Find("#parquet-codec").ChangeAsync(nameof(ParquetCompression.Gzip));
 
         await Assert.That(cut.FindAll("#parquet-gzip").Count).IsEqualTo(1);
     }

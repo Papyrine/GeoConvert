@@ -44,6 +44,7 @@ public class ModelTests
         await Assert.That(box.ExpandToInclude(new Position(20, 20)))
             .IsEqualTo(new(0, 0, 20, 20));
         await Assert.That(Envelope.Empty.Width).IsEqualTo(0d);
+        await Assert.That(Envelope.Empty.Height).IsEqualTo(0d);
     }
 
     [Test]

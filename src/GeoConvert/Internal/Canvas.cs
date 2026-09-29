@@ -92,15 +92,8 @@ sealed class Canvas : IDisposable, IRenderSurface
     }
 
     // Packs RGBA into a uint so that reinterpreting the pixel buffer as uints yields the R,G,B,A byte order.
-    static uint Pack(Rgba color)
-    {
-        if (BitConverter.IsLittleEndian)
-        {
-            return (uint)(color.R | (color.G << 8) | (color.B << 16) | (color.A << 24));
-        }
-
-        return (uint)((color.R << 24) | (color.G << 16) | (color.B << 8) | color.A);
-    }
+    static uint Pack(Rgba color) =>
+        MemoryMarshal.Read<uint>([color.R, color.G, color.B, color.A]);
 
     public int Width { get; }
 

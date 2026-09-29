@@ -97,6 +97,23 @@ public class GeoParquetTests
     }
 
     [Test]
+    public async Task Roundtrips_null_geometry()
+    {
+        var features = new FeatureCollection
+        {
+            new Feature(null, new Dictionary<string, object?> { ["name"] = "nowhere" }),
+            new Feature(new Point(new(1, 2))),
+        };
+
+        var result = TestSupport.RoundtripStream(features, GeoFormat.GeoParquet);
+
+        await Assert.That(result.Count).IsEqualTo(2);
+        await Assert.That(result.Features[0].Geometry).IsNull();
+        await Assert.That(result.Features[0].Properties["name"]).IsEqualTo("nowhere");
+        await Assert.That(result.Features[1].Geometry).IsTypeOf<Point>();
+    }
+
+    [Test]
     public async Task Roundtrips_empty()
     {
         var result = TestSupport.RoundtripStream([], GeoFormat.GeoParquet);

@@ -27,4 +27,8 @@ public class WktTests
         var point = (Point)Wkt.ParseGeometry("POINT (1 2 3)");
         await Assert.That(point.Coordinate.Z).IsEqualTo(3d);
     }
+
+    [Test]
+    public async Task TruncatedMultiPointThrows() =>
+        await Assert.That(TestSupport.ThrowsGeo(() => Wkt.ParseGeometry("MULTIPOINT ("))).IsTrue();
 }

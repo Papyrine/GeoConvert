@@ -309,7 +309,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L468-L483' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L502-L517' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderWebMercator' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 From the command line, pass `--projection`:
@@ -335,7 +335,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "states.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L488-L502' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L522-L536' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLambert' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -364,7 +364,7 @@ var options = new RenderOptions
 
 MapRenderer.RenderPng(features, "world.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L507-L526' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L541-L560' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderGoode' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 ```
@@ -500,14 +500,21 @@ var options = new RenderOptions
     Stroke = new(120, 120, 120),
     StrokeWidth = 1,
     Label = feature =>
-        feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+    {
+        if (feature.Properties.TryGetValue("NAME", out var value))
+        {
+            return value as string;
+        }
+
+        return null;
+    },
     LabelSize = 14,
     LabelColor = new(30, 30, 30),
     LabelHalo = new(255, 255, 255, 220),
 };
 MapRenderer.RenderPng(features, "europe-halo.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L373-L399' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L393-L426' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelHalo' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_halo.verified.png" width="600">
@@ -536,7 +543,14 @@ var options = new RenderOptions
     Stroke = new(120, 120, 120),
     StrokeWidth = 1,
     Label = feature =>
-        feature.Properties.TryGetValue("NAME", out var value) ? value as string : null,
+    {
+        if (feature.Properties.TryGetValue("NAME", out var value))
+        {
+            return value as string;
+        }
+
+        return null;
+    },
     LabelSize = 14,
     LabelColor = new(30, 30, 30),
     LabelHalo = null,
@@ -544,7 +558,7 @@ var options = new RenderOptions
 };
 MapRenderer.RenderPng(features, "europe-knockout.png", options);
 ```
-<sup><a href='/src/Tests/Snippets.cs#L404-L431' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L431-L465' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabelKnockout' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 <img src="/src/Tests/LabelTests.Render_snapshot_label_knockout.verified.png" width="600">
@@ -568,7 +582,14 @@ var features = GeoConverter.Read("cities.geojson");
 var options = new RenderOptions
 {
     Label = feature =>
-        feature.Properties.TryGetValue("name", out var value) ? value as string : null,
+    {
+        if (feature.Properties.TryGetValue("name", out var value))
+        {
+            return value as string;
+        }
+
+        return null;
+    },
     LabelSize = 18,
     LabelColor = new(20, 20, 20),
     LabelHalo = new(255, 255, 255, 220),
@@ -579,9 +600,15 @@ MapRenderer.RenderPng(features, "cities.png", options);
 // Per-layer override: a child layer can carry its own label callback (or scale/color/halo)
 // independent of the options-wide default. Setting Label = _ => null on a LayerStyle
 // suppresses labelling for that layer.
-options.LayerStyle = layer => layer.Name == "annotations"
-    ? new LayerStyle { Label = feature => feature.Properties["text"] as string }
-    : null;
+options.LayerStyle = layer =>
+{
+    if (layer.Name == "annotations")
+    {
+        return new LayerStyle { Label = feature => feature.Properties["text"] as string };
+    }
+
+    return null;
+};
 
 // By default, labels are placed largest-feature-first so when two collide the bigger
 // polygon's name wins. Override LabelPriority to drive collision order from anything
@@ -589,7 +616,14 @@ options.LayerStyle = layer => layer.Name == "annotations"
 // closure. Without this, Natural Earth's "Ireland" would beat "United Kingdom" on file
 // order; with population priority, UK (67M) outranks Ireland (5M) and gets the spot.
 options.LabelPriority = feature =>
-    feature.Properties.TryGetValue("POP_EST", out var p) ? Convert.ToDouble(p) : 0;
+{
+    if (feature.Properties.TryGetValue("POP_EST", out var p))
+    {
+        return Convert.ToDouble(p);
+    }
+
+    return 0;
+};
 
 // Or look priorities up in a separate table — useful when the data and the importance
 // ranking live in different files.
@@ -610,7 +644,7 @@ options.LabelPriority = feature =>
     return 0;
 };
 ```
-<sup><a href='/src/Tests/Snippets.cs#L310-L368' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L310-L388' title='Snippet source file'>snippet source</a> | <a href='#snippet-RenderLabels' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 
@@ -652,7 +686,7 @@ using (var parquet = File.Create("world.parquet"))
     GeoParquet.Write(parquet, features, ParquetCompression.Gzip, CompressionLevel.SmallestSize);
 }
 ```
-<sup><a href='/src/Tests/Snippets.cs#L438-L463' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
+<sup><a href='/src/Tests/Snippets.cs#L472-L497' title='Snippet source file'>snippet source</a> | <a href='#snippet-Compression' title='Start of snippet'>anchor</a></sup>
 <!-- endSnippet -->
 
 

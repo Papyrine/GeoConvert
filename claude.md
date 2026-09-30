@@ -230,6 +230,6 @@ the root has features); single-file `.shp` mode is unchanged.
   `SkiaSurface` / `ImageSharpSurface` directly: the surfaces' primitive guards (fully transparent fill,
   empty ring, sub-two-point chain) are unreachable through the renderer pipeline, which never emits any
   of them. All three sign with `src/key.snk`, so every IVT entry carries the same public key.
-- Tests use TUnit + Verify.TUnit + Verify.DiffPlex. `RoundTripTests` write→read→`Verify` the resulting
+- Tests use TUnit + Verify.TUnit. `RoundTripTests` write→read→`Verify` the resulting
   GeoJSON (so the snapshot shows what each format preserves); `SerializeTests` snapshot raw output;
   shared fixtures are in `src/Tests/Sample.cs`.

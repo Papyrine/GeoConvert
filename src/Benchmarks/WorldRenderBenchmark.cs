@@ -26,14 +26,14 @@ public class WorldRenderBenchmark
     [GlobalSetup]
     public void Setup()
     {
-        var name = Layer switch
+        var file = Layer switch
         {
-            WorldLayer.Coastline => "world-coastline.fgb",
-            WorldLayer.Borders => "world-borders.fgb",
-            WorldLayer.Land => "world-land.fgb",
+            WorldLayer.Coastline => ProjectFiles.SampleData.world_coastline_fgb,
+            WorldLayer.Borders => ProjectFiles.SampleData.world_borders_fgb,
+            WorldLayer.Land => ProjectFiles.SampleData.world_land_fgb,
             _ => throw new ArgumentOutOfRangeException(nameof(Layer), Layer, null),
         };
-        var path = Path.Combine(AppContext.BaseDirectory, "SampleData", name);
+        var path = Path.Combine(AppContext.BaseDirectory, file.Path);
         data = GeoConverter.Read(path, GeoFormat.FlatGeobuf);
     }
 

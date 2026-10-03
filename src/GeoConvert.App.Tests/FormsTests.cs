@@ -61,7 +61,7 @@ public class FormsTests
         {
             return WinFormsSnapshot.RenderAfter(
                 () => new DiffForm(mode),
-                _ => _.LoadAndRenderAsync("before.geojson", "after.geojson"),
+                _ => _.LoadAndRenderAsync(ProjectFiles.before_geojson, ProjectFiles.after_geojson),
                 1000,
                 680);
         }

@@ -13,6 +13,7 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="ProjectDefaults" PrivateAssets="all" />
+    <PackageReference Include="ProjectFiles" PrivateAssets="all" />
     <ProjectReference Include="..\GeoConvert\GeoConvert.csproj" />
   </ItemGroup>
 

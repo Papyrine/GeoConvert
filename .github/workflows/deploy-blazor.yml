@@ -21,11 +21,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      # The net10.0 test executable needs the .NET 10 runtime.
-      - name: Setup .NET 10
+      # The SDK pinned in global.json (net11.0 web app and tests).
+      - name: Setup .NET
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: '10.0.x'
+          global-json-file: global.json
 
       # The app sets WasmEnableThreads, whose multithreaded runtime (the one carrying
       # JavaScriptExports.InstallMainSynchronizationContext) ships in the wasm-tools workload. Without
@@ -39,7 +39,7 @@ jobs:
       # TUnit ships as an executable on Microsoft.Testing.Platform; run it directly rather than via
       # `dotnet test`, which rejects it under the VSTest path.
       - name: Run tests
-        run: dotnet src/GeoConvert.Web.Tests/bin/Release/net10.0/GeoConvert.Web.Tests.dll
+        run: dotnet src/GeoConvert.Web.Tests/bin/Release/net11.0/GeoConvert.Web.Tests.dll
 
       - name: Publish
         run: dotnet publish src/GeoConvert.Web --configuration Release --output publish

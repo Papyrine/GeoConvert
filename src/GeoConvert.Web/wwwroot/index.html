@@ -43,7 +43,8 @@
                 // net11 rc.3 works around a runtime bug: its pthread pool never sees a worker as loaded, so
                 // creating a thread once the default 7-worker pool is used up (e.g. the .NET Timer thread
                 // behind the first Task.Delay/PeriodicTimer) deadlocks JS→.NET dispatch and every UI event
-                // dies. A bigger pool keeps a worker free. Drop once the runtime fix ships.
+                // dies. A bigger pool keeps a worker free. Drop once the runtime fix ships:
+                // https://github.com/dotnet/runtime/issues/136492
                 return Blazor.start({
                     configureRuntime: builder => builder.withConfig({ pthreadPoolInitialSize: 16 })
                 });

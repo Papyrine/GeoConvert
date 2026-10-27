@@ -21,7 +21,9 @@
     <div id="app">
         <div class="loading">
             <div class="spinner"></div>
-            <p>Loading GeoConvert...</p>
+            <p class="loading-message">Loading GeoConvert...</p>
+            <p class="loading-version"></p>
+            <p class="loading-error" hidden></p>
         </div>
     </div>
 
@@ -32,14 +34,47 @@
     </div>
     <script src="_framework/blazor.webassembly.js" autostart="false"></script>
     <script src="js/interop.js"></script>
+    <!-- Written by the build (GeoConvert.Web.csproj's WriteVersionScript): window.geoConvertVersion. -->
+    <script src="js/version.js"></script>
     <script>
         window.themeManager.initializeTheme();
 
-        // Hold the boot until coi.js reports cross-origin isolation. The multithreaded runtime asserts on
-        // a missing SharedArrayBuffer, and on a first visit isolation only arrives once coi.js has
-        // installed its service worker and reloaded — autostart would race that and abort.
-        window.crossOriginIsolation.then(isolated => {
-            if (isolated) {
+        // The loading screen says which build it is, and why it stopped if the app cannot start: a boot
+        // failure is otherwise only in the console, which a phone does not show, and the spinner turns on.
+        // Once the app has rendered, the loading screen is gone and these listeners write nothing.
+        (() => {
+            const loading = document.querySelector('#app .loading');
+            loading.querySelector('.loading-version').textContent = window.geoConvertVersion ?? '';
+            const fail = reason => {
+                if (!loading.isConnected) {
+                    return;
+                }
+
+                loading.classList.add('failed');
+                loading.querySelector('.loading-message').textContent = 'GeoConvert could not start';
+                const error = loading.querySelector('.loading-error');
+                error.textContent = String(reason?.message ?? reason ?? 'Unknown error');
+                error.hidden = false;
+            };
+            addEventListener('error', event => fail(event.error ?? event.message));
+            addEventListener('unhandledrejection', event => fail(event.reason));
+
+            if (typeof WebAssembly !== 'object') {
+                fail('This browser has WebAssembly turned off, and GeoConvert runs on it. On an iPhone or iPad, Lockdown Mode turns it off.');
+                return;
+            }
+
+            // Hold the boot until coi.js reports cross-origin isolation. The multithreaded runtime asserts on
+            // a missing SharedArrayBuffer, and on a first visit isolation only arrives once coi.js has
+            // installed its service worker and reloaded — autostart would race that and abort.
+            window.crossOriginIsolation.then(isolated => {
+                if (!isolated) {
+                    fail('GeoConvert needs cross-origin isolation (SharedArrayBuffer), which this browser or ' +
+                        'host is not providing. Try a current version of Chrome, Edge, Firefox or Safari, ' +
+                        'with service workers enabled.');
+                    return;
+                }
+
                 // net11 rc.3 works around a runtime bug: its pthread pool never sees a worker as loaded, so
                 // creating a thread once the default 7-worker pool is used up (e.g. the .NET Timer thread
                 // behind the first Task.Delay/PeriodicTimer) deadlocks JS→.NET dispatch and every UI event
@@ -48,13 +83,8 @@
                 return Blazor.start({
                     configureRuntime: builder => builder.withConfig({ pthreadPoolInitialSize: 16 })
                 });
-            }
-
-            document.getElementById('app').innerHTML =
-                '<div class="loading"><p>GeoConvert needs cross-origin isolation (SharedArrayBuffer), ' +
-                'which this browser or host is not providing. Try a current version of Chrome, Edge, ' +
-                'Firefox or Safari, with service workers enabled.</p></div>';
-        });
+            }).catch(fail);
+        })();
     </script>
 </body>
 
